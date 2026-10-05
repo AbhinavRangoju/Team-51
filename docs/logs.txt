@@ -951,3 +951,87 @@ metadata/team.yaml (team_id, name, repository, and exactly 2 or 4 members — al
 empty) and metadata/submission.yaml, where team_id, repository, commit_sha,
 deployment_url and submitted_at are all empty strings. Both must be filled
 before 2026-10-06T11:00:00+05:30.
+
+================================================================================
+[2026-10-05T16:41:20+05:30] Project status review — what is done so far
+================================================================================
+User Prompt (verbatim):
+what allis done
+
+Agent Response:
+Surveyed the repo rather than answering from memory: git log, routeTree.gen.ts
+registrations, src LOC by area, deployment/, docs/APPROACH.md template markers,
+both metadata files.
+
+SHIPPED — 9 routes built and registered in routeTree.gen.ts:
+  /  /shop  /categories  /deals  /vendors  /product/$id  /cart  /checkout  /login
+Roughly 8,100 lines of TS/TSX in src/ excluding the generated route tree:
+components 4,933 across 53 files, routes 1,947 across 10, lib 1,139 across 12.
+
+Feature state per area:
+* Storefront: hero/landing, category browsing, Festive Week deals with live
+  countdown, seller directory plus per-seller store view, product detail with
+  gallery, specs/seller/reviews tabs, bundle and related products.
+* Commerce: cart with per-seller grouping, saved-for-later, delivery/GST/total
+  maths; 4-step checkout (address, delivery speed, payment, review) with field
+  validation and order creation.
+* Auth: /login with AuthPanel + CharacterScene and the blurred themed stage.
+* State: localStorage-backed store (user, cart, wishlist, orders).
+* Hubby: Gemini-backed assistant grounded in the full catalogue (this turn).
+
+NOT BUILT — 5 routes are linked from StoreLayout and checkout.tsx but have no
+file: /account, /orders, /vendor-register, /vendor, /admin. These are the entire
+22-error typecheck baseline; the errors are unresolved Link targets, not bugs.
+
+SUBMISSION GAPS, all blocking and all still empty:
+* metadata/team.yaml — team_id, name, repository, and 2 or 4 members
+* metadata/submission.yaml — team_id, repository, commit_sha, deployment_url,
+  submitted_at
+* docs/APPROACH.md — still the template, 6 placeholder markers remain
+* deployment/ — only README.md and .gitkeep; nothing deployed
+* 8 commits unpushed; origin/Frontend still sits at the "test" commit
+
+VERIFICATION STATE: npm test 1/1 passing (one route-smoke test, 31 lines in
+src/test). npm run build green. npm run typecheck at the 22-error baseline with
+zero errors in any code written this session. No security scanning or SAST has
+been run. Hubby was verified against the live Gemini API this turn; nothing else
+has been verified beyond the build and the single smoke test.
+
+TIME: roughly 18h 20m to the 2026-10-06T11:00:00+05:30 deadline.
+
+Agent Response Summary:
+Read-only status review, no files changed other than this log. Nine storefront
+routes are done and the build is green; five account/vendor/admin routes remain
+and account for the whole typecheck baseline. Flagged that every submission
+artefact — both metadata files, APPROACH.md, deployment, and the unpushed
+branch — is still outstanding, which is the real risk with 18 hours left.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* `git log --oneline` and `git status -sb` for commit and push state
+* Grepped src/routeTree.gen.ts for registered route paths
+* Counted TS/TSX lines per src area, excluding routeTree.gen.ts
+* Listed deployment/ and counted remaining template markers in docs/APPROACH.md
+* Read metadata/submission.yaml and metadata/team.yaml
+
+--------------------------------------------------------------------------------
+[2026-10-05T16:42:00+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+eba9548
+
+Commit Message:
+docs: log project status review
+
+Branch:
+Frontend
+
+Files in commit:
+* docs/logs.txt (Modified)
+
+Read-only review turn; no source files touched.
