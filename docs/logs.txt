@@ -404,3 +404,121 @@ Actions Taken:
 * `npm run typecheck` — zero errors in deals.tsx
 * `npm run build` — exit 0; code-split to .output/public/assets/deals-Bk-PRJgp.js (11.21 kB, 3.74 kB gzip)
 
+--------------------------------------------------------------------------------
+[2026-10-05T14:53:00+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+fe57515
+
+Commit Message:
+feat: add /deals page
+
+Branch:
+Frontend
+
+Files in commit:
+* src/routes/deals.tsx (Created)
+* src/routeTree.gen.ts (Modified)
+* docs/logs.txt (Modified)
+
+Progress:
+Built (2/9):     /categories, /deals
+Remaining (7):   /vendors, /orders, /account, /login, /vendor, /vendor-register, /admin
+
+================================================================================
+[2026-10-05T15:14:20+05:30] Build page 3 of 9: /vendors
+================================================================================
+User Prompt (verbatim):
+go ahead
+
+Agent Response:
+Built /vendors, the third missing route and the last of the pure-browse pages.
+
+Constraint discovered first: routes/product.$id.tsx links to /vendors twice —
+line 75 ("Sold by <vendor>") and line 128 ("Visit store" in the Seller tab) —
+both with no params and no search. So the route had to work bare. Rather than
+edit those existing links, /vendors accepts an OPTIONAL ?v=<vendorId> search
+param. Bare /vendors renders the directory; /vendors?v=v2 renders that single
+store. An unknown id falls through to the directory rather than erroring, which
+was verified.
+
+Theme preserved — no new CSS, no token changes, styles.css untouched, no shared
+component modified. Composed from existing primitives only:
+* StoreLayout, container-mh, card-mh, shadow-lift
+* ProductCard for the in-store product grid
+* Stars, StatusBadge, SectionHeader, EmptyState from components/mh/ui.tsx
+  (StatusBadge already maps "Verified" to the success tone and
+  "Pending Verification" to the warning tone — no new status handling needed)
+* Button variants brand / outline / sm, the pill search + pill select from
+  routes/shop.tsx, the chip toggle pattern from routes/deals.tsx
+* The bg-primary band and stat tiles from routes/index.tsx
+
+Directory view:
+1. Breadcrumb, h1 "Independent sellers", subtitle with verified / pending / city
+   counts all derived from the vendors array.
+2. Search across seller name, tagline and city; sort by Top rated, Most
+   products, Newest, A to Z; an "All sellers" / "Verified only" chip toggle.
+3. Card grid for all 8 sellers: avatar initial, name with BadgeCheck when
+   verified, tagline, status badge, star rating or "Not yet rated" for unrated
+   stores, city / since / catalogue size, up to three clickable product
+   thumbnails, live listing count and a Visit store button.
+4. EmptyState when the search matches nothing.
+5. bg-primary "How verification works" band and a Buyer Guarantee card.
+
+Single-store view (?v=):
+Store header with avatar, name, verification badge, status, tagline, metadata,
+rating and a "listings from" price; a back link to the directory; then that
+seller's products in a ProductCard grid with the store's average product rating.
+Sellers with no published products get a tailored EmptyState whose copy differs
+depending on whether the store is verified-but-empty or still in verification.
+
+SECURITY / PRIVACY DECISION — recorded deliberately:
+The Vendor type in lib/data.ts carries `owner` and `email` fields
+(e.g. arjun@nordicsound.in). The seller email is NOT rendered anywhere on this
+public page. Publishing seller contact addresses on an unauthenticated directory
+invites scraping and targeted phishing of the marketplace's own sellers. Only
+business-level information is exposed. Verified by asserting that three known
+seed emails appear nowhere in the rendered HTML of the directory, a populated
+store and a pending store. If seller contact is needed later it belongs behind
+authentication on the vendor or admin dashboards, not here.
+
+Honesty about counts: vendor.products (64, 128, 210 ...) is a catalogue figure in
+the seed data, while the seeded product list holds only 1-3 items per seller.
+Both are shown but labelled distinctly — "N products" as the catalogue size and
+"N live listings" for what is actually browsable — rather than conflating them.
+
+Agent Response Summary:
+Created src/routes/vendors.tsx serving both a seller directory and a per-seller
+store view off an optional ?v= search param, so the two existing bare /vendors
+links from the product page keep working without being modified. All 8 sellers
+render with correct verification badges, the 2 unverified stores correctly show
+"Not yet rated" and a verification-pending empty state, and seller email
+addresses are deliberately withheld from the public page. vendors.tsx is
+type-clean; routes/index.tsx and routes/product.$id.tsx now have ZERO type
+errors, since /categories, /deals and /vendors were their only unresolved links.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* src/routes/vendors.tsx (Created)
+* src/routeTree.gen.ts (Modified — regenerated automatically by the TanStack Start vite plugin)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read src/routes/product.$id.tsx to determine the exact shape of the two existing /vendors links before designing the route signature
+* Authored src/routes/vendors.tsx with validateSearch for the optional ?v= param
+* HTTP-probed 4 variants — /vendors 200, ?v=v2 200, ?v=v7 200, ?v=nope 200 falling back to the directory with a byte-identical response length
+* Asserted all 8 sellers present in the directory, 6 verified badges, 2 Pending Verification, 2 "Not yet rated", 8 Visit store links
+* Asserted store v2 lists its 3 real products (Velocity Run 3, Cork Yoga, Oat Merino)
+* Asserted store v7 renders the "No live listings yet" state with verification-pending copy
+* Asserted zero seller email addresses leak into any of the three rendered views
+* `npm run typecheck` — zero errors in vendors.tsx; index.tsx and product.$id.tsx now fully clean
+* `npm test` — 1/1 passing
+* `npm run build` — exit 0; code-split to .output/public/assets/vendors-BtIlWMJb.js (11.69 kB, 3.69 kB gzip)
+
+Remaining typecheck failures and their causes:
+* StoreLayout.tsx (10) + checkout.tsx (1) — the 6 routes still unbuilt
+* chart.tsx (10) + calendar.tsx (1) — stale shadcn wrappers vs the installed
+  recharts / react-day-picker majors; neither file is imported by any route
+
