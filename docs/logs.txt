@@ -1551,3 +1551,69 @@ Actions Taken:
 * git ls-tree -r --name-only origin/main  (12 files; src/ has only .gitkeep)
 * git ls-tree -r --name-only Frontend  (127 files; 109 under src/)
 * git show origin/main:SECURITY_ARCHITECTURE.md  (read the design doc's premises)
+
+================================================================================
+[2026-10-05T21:34:00+05:30] Prepare PR: Frontend -> main (gh unavailable, pushed + compare link)
+================================================================================
+User Prompt (verbatim):
+Go ahead with merging Frontend into main, but use a Pull Request rather than a
+direct local merge. [8-step checklist: verify clean, verify remote SHA, compare
+against main, keep SECURITY_ARCHITECTURE.md, don't modify app code, create PR,
+don't auto-merge, report URL + file summary + conflicts. Stop after creating.]
+
+Agent Response:
+Worked the checklist. Could NOT create the PR programmatically — the GitHub CLI
+(gh) is not installed and no GitHub auth/token is present in this environment, so
+there is no non-interactive way to open a PR from here. Did everything up to that
+point and prepared a one-click compare link for the user to open the PR, which
+also keeps PR creation under their control (step 7: do not auto-merge).
+
+Checklist results:
+1. Frontend tree: CLEAN.
+2. Remote SHA: local Frontend was 3 commits (doc/log only) ahead of origin/
+   Frontend (19b34c6). Pushed so the PR reflects current work — see COMMIT RECORD.
+3. Compare Frontend vs origin/main (3-dot, i.e. what the PR adds to main):
+   121 files changed, +20,700 / -17.  117 added, 3 modified, 1 deleted.
+   - Modified (3): docs/logs.txt, metadata/team.yaml, metadata/submission.yaml
+     (main's seed stubs/empties updated to Frontend's filled versions).
+   - Deleted (1): src/.gitkeep — the placeholder, correctly superseded by real
+     src/ code. No other deletions.
+   - Areas: src/components 55, src/routes 20, src/lib 14, src/assets 12, plus
+     config (vite/vitest/tsconfig) and src entrypoints.
+4. SECURITY_ARCHITECTURE.md: PRESERVED. merge-tree merged tree f5ede13 contains
+   it; Frontend has 0 commits touching it; it does not appear in the PR diff
+   because it lives only on main's side of the merge base. Not discarded.
+5. No application code modified for the merge — only this log entry was written.
+6. PR creation: prepared via compare URL (gh unavailable; see above).
+7. Not merged.
+8. Conflicts: NONE. merge-tree reported 0 conflict lines against current
+   origin/main. No CI/checks are configured in the repo, so none to report.
+
+One-click PR link (opens a Frontend -> main PR, prefilled):
+  https://github.com/AbhinavRangoju/Team-51/compare/main...Frontend?expand=1
+
+Also flagged again (unchanged from the prior turn): main's SECURITY_ARCHITECTURE.md
+describes a server-authoritative backend design that the client-only Frontend
+build does not implement. Merging places the two side by side; the team still
+needs to reconcile doc vs implementation before judging.
+
+Agent Response Summary:
+Verified a clean, conflict-free, additive merge (121 files, +20,700/-17; only
+src/.gitkeep removed) that preserves the teammate's SECURITY_ARCHITECTURE.md, and
+pushed Frontend so the branch is PR-ready. Could not open the PR itself because
+gh and GitHub auth are absent, so prepared the prefilled compare link for the
+user to click. Nothing merged; no app code changed.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git fetch origin; git status (clean); confirmed Frontend 3 ahead of origin
+* Get-Command gh -> not installed; no GitHub token available
+* git merge-tree --write-tree origin/main Frontend -> tree f5ede13, 0 conflicts
+* Confirmed SECURITY_ARCHITECTURE.md present in merged tree, 0 Frontend commits touch it
+* git diff --stat / --name-status origin/main...Frontend -> 121 files, 1 deletion (src/.gitkeep)
+* (push recorded below)
