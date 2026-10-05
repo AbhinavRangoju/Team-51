@@ -522,3 +522,123 @@ Remaining typecheck failures and their causes:
 * chart.tsx (10) + calendar.tsx (1) — stale shadcn wrappers vs the installed
   recharts / react-day-picker majors; neither file is imported by any route
 
+--------------------------------------------------------------------------------
+[2026-10-05T15:15:05+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+99dc064
+
+Commit Message:
+feat: add /vendors directory and per-seller store view
+
+Branch:
+Frontend
+
+Files in commit:
+* src/routes/vendors.tsx (Created)
+* src/routeTree.gen.ts (Modified)
+* docs/logs.txt (Modified)
+
+Progress:
+Built (3/9):     /categories, /deals, /vendors
+Remaining (6):   /login, /account, /orders, /vendor-register, /vendor, /admin
+
+Note on remaining order: /login should come next because /account, /orders,
+/vendor and /admin are all role-gated by store.user, and there is currently no
+way to populate it — store.login() exists but nothing calls it.
+
+================================================================================
+[2026-10-05T15:34:40+05:30] Replace flat black login stage with blurred site theme
+================================================================================
+User Prompt (verbatim):
+This is our login back, I only need the black area of the page to be covered with the theme of the website but blurred. Only touch that area.
+[attached: screenshot of /login showing the auth card on a flat near-black surround]
+
+Agent Response:
+Context: the user had rebuilt /login themselves between turns, replacing the
+version generated earlier in this session. The current page is
+src/routes/login.tsx composing src/components/auth/AuthPanel.tsx and
+src/components/auth/CharacterScene.tsx, with new tokens added to src/styles.css
+(--stage, --scene, --shadow-auth, --shadow-button, --mob-*). The earlier agent
+version of login.tsx was reverted by the user and is gone. Nothing from it was
+reinstated.
+
+Scope confirmed before editing: grepped for `stage` across src and found
+`bg-stage` is used in exactly ONE place — login.tsx line 29, the <main> element.
+That is the black area in the screenshot. So the change could be confined to
+that element without touching the card, the scene panel, the auth components, or
+the shared stylesheet.
+
+Change made — three edits, all inside src/routes/login.tsx:
+1. Added `import hero from "@/assets/hero.jpg"`.
+2. Added a local StageBackdrop component: the homepage hero photograph at
+   opacity-75 / blur-[70px] / scale-110, four palette washes
+   (bg-brand/45, bg-warning/40, bg-success/30, bg-brand-soft/45, each
+   blur-[120px]), a bg-surface/25 warm scrim, and a radial vignette built from
+   color-mix(in oklab, var(--stage) ...) so the card's white edge stays defined.
+   pointer-events-none and aria-hidden="true" — purely decorative.
+3. On <main>: added `relative isolate` and inserted <StageBackdrop />.
+   `bg-stage` was KEPT as the base colour underneath. The backdrop sits at
+   -z-10; `isolate` confines that to this stacking context so the card, which
+   was not modified at all, still paints above it.
+
+Everything is driven by existing theme tokens — no new CSS, no new tokens, and
+src/styles.css was not touched.
+
+Two corrections made during the work, both from reading screenshots rather than
+assuming:
+* First attempt used opacity-40 on the photo plus a bg-stage/55 overlay. The
+  screenshot showed it reading as a near-black gradient, not as the site theme.
+  Raised the photo to opacity-75, strengthened the washes, and swapped the dark
+  overlay for a warm bg-surface/25 scrim plus an edge-only vignette.
+* First attempt also added `overflow-hidden` to <main>. Removed it — the
+  backdrop div already clips its own children, so on <main> it was redundant and
+  only risked changing how the card's own overflow behaves. <main>'s overflow
+  behaviour is now exactly as the user had it.
+
+Investigated, NOT changed — pre-existing mobile overflow:
+At a 420px viewport the auth card is wider than the screen and the right side of
+the form (the "Forgot password?" link and the password eye button) is cut off.
+This is NOT caused by this change. Proven, not assumed: temporarily removed
+<StageBackdrop /> and re-screenshotted at 420px — the clipping is identical, the
+only difference being the stage colour. An absolutely positioned inset-0 child
+cannot widen its containing block, so the backdrop provably cannot cause it. The
+cause is inside the card: AuthPanel's content wrapper is `px-6` around a
+`max-w-sm` column, and something in that subtree is not shrinking below roughly
+456px. Left alone because the user scoped this turn to the black area only. Worth
+fixing in a later turn.
+
+Agent Response Summary:
+Confined the change to the one element that renders the black area. The login
+stage now shows the site's own palette — the homepage hero photo and brand,
+warning, success and brand-soft washes — heavily blurred, with a vignette so the
+card keeps its edge. The card, the character scene, both auth components and
+styles.css were not modified. Verified visually at 1280px and 420px with real
+headless-Chrome screenshots, not inferred. Also confirmed the temporary
+diagnostic marker was removed from the shipped file.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* src/routes/login.tsx (Modified — hero import, StageBackdrop component, two classes on <main>)
+
+Also committed this turn, previously untracked work authored by the user:
+* src/components/auth/AuthPanel.tsx (Created by user)
+* src/components/auth/CharacterScene.tsx (Created by user)
+* src/styles.css (Modified by user — auth tokens)
+* src/routeTree.gen.ts (Modified — /login route registered)
+
+Actions Taken:
+* Read src/routes/login.tsx to see the user's rebuilt page before editing
+* Grepped src for `stage|shadow-auth|bg-scene` to confirm bg-stage has exactly one usage
+* Read src/styles.css lines 60-121 for the --stage / --scene / --shadow-auth token definitions
+* Grepped src/components/auth/AuthPanel.tsx for width classes while diagnosing the mobile overflow
+* Added StageBackdrop and wired it into <main>
+* Captured headless-Chrome screenshots at 1280x860 after each iteration and compared them
+* Captured 420x900 screenshots with and without the backdrop to prove the mobile clipping is pre-existing
+* Asserted /login returns 200 with no error page, and that no DIAGNOSTIC-TEMP marker remained
+* `npm run typecheck` — zero errors in login.tsx or components/auth
+* `npm test` — 1/1 passing
+* `npm run build` — exit 0
+

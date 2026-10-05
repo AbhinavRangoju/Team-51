@@ -58,6 +58,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-stage: var(--stage);
+  --color-scene: var(--scene);
   --shadow-card: var(--shadow-card);
   --shadow-lift: var(--shadow-lift);
 }
@@ -109,6 +111,19 @@
   --sidebar-ring: oklch(0.66 0.19 45);
   --shadow-card: 0 1px 2px oklch(0.2 0.01 60 / 0.04), 0 4px 16px -8px oklch(0.2 0.01 60 / 0.08);
   --shadow-lift: 0 2px 4px oklch(0.2 0.01 60 / 0.04), 0 18px 40px -18px oklch(0.2 0.01 60 / 0.22);
+
+  /* Auth page (/login): dark stage behind the card, warm scene panel for the characters */
+  --stage: oklch(0.19 0.012 60);
+  --scene: oklch(0.945 0.018 75);
+  --shadow-auth: 0 40px 80px -30px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.04);
+  --shadow-button: 0 10px 24px -10px color-mix(in oklab, var(--brand) 70%, transparent);
+  --mob-coral: oklch(0.68 0.18 38);
+  --mob-ink: oklch(0.28 0.02 60);
+  --mob-mint: oklch(0.8 0.1 165);
+  --mob-sun: oklch(0.86 0.15 90);
+  --mob-eye: oklch(0.995 0 0);
+  --mob-pupil: oklch(0.18 0.01 60);
+  --mob-blush: oklch(0.75 0.12 20);
 }
 
 @layer base {
@@ -142,4 +157,49 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-card);
+}
+
+/* ---------- Auth character scene (src/components/auth) ---------- */
+.mob { transform-box: fill-box; transform-origin: 50% 100%; animation: mob-breathe 4.2s ease-in-out infinite; }
+.mob-2 { animation-duration: 5s; animation-delay: -1.3s; }
+.mob-3 { animation-duration: 4.6s; animation-delay: -2.1s; }
+.mob-4 { animation-duration: 3.6s; animation-delay: -0.6s; }
+
+@keyframes mob-breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+  50% { transform: translateY(-4px) scale(1.012, 0.99) rotate(-0.6deg); }
+}
+
+.eye-blink { transform-box: fill-box; transform-origin: center; animation: blink 5.5s infinite; }
+.eye-lid { transform-box: fill-box; transform-origin: center; transition: transform 0.45s cubic-bezier(0.5, 0, 0.2, 1.3); }
+
+@keyframes blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  96.5% { transform: scaleY(0.08); }
+}
+
+[data-mood="eyesClosed"] .eye-lid { transform: scaleY(0.07); transition-duration: 0.35s; }
+
+.mob-blush { opacity: 0; transition: opacity 0.5s ease; }
+[data-mood="eyesClosed"] .mob-blush { opacity: 0.8; }
+
+.mob-face { transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.2, 1); }
+[data-mood="lookingAway"] .mob-face,
+[data-mood="eyesClosed"] .mob-face { transform: translate(var(--away-x, 0px), var(--away-y, 0px)); }
+
+.mouth-open { opacity: 0; transition: opacity 0.3s; }
+.mouth-smile { transition: opacity 0.3s; }
+[data-mood="lookingAway"] .mouth-open { opacity: 1; }
+[data-mood="lookingAway"] .mouth-smile { opacity: 0; }
+
+.form-swap { animation: form-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes form-in {
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mob, .eye-blink, .form-swap { animation: none !important; }
+  .eye-lid, .mob-face { transition-duration: 0.01s !important; }
 }
