@@ -1035,3 +1035,201 @@ Files in commit:
 * docs/logs.txt (Modified)
 
 Read-only review turn; no source files touched.
+
+================================================================================
+[2026-10-05T21:05:30+05:30] Build the 9 missing pages: account, orders, vendor, legal
+================================================================================
+User Prompt (verbatim):
+This Pages are not yet done work on it 
+
+My orders
+
+My account
+
+Become a vender
+
+Vendor dashboard
+
+Notification
+
+Wishlist
+
+Sign in , sign up and continue with Google
+
+Privacy , terms , returns policy and seller policy
+
+Agent Response:
+Built all of it. Nine new routes, taking the app from 9 routes to 17.
+
+BLOCKER FOUND AND FIXED FIRST — src/components/auth/AuthPanel.tsx never called
+store.login(). Both forms ran a 1.3s fakeAuth() and set a success flag, so no
+session was ever created and /account, /orders and /vendor were unreachable by
+construction. Nothing downstream could work until that was fixed.
+
+Auth now actually signs you in:
+* LoginForm, SignupForm and the Google button all write a session and redirect.
+* Added a "Sign in as" role picker (Shopper / Seller) because MarketHub gates
+  /vendor on user.role and a seeded demo has no identity provider to supply one.
+  Admin is deliberately NOT offered — there is no /admin console in this build,
+  so listing the role would hand the visitor a 404.
+* Seeded accounts keep their real names: signing in as priya@mail.com resolves
+  to "Priya Sharma" and surfaces her three seeded orders. Seller emails are
+  matched if typed but never shown or suggested anywhere.
+* Signup now requires accepting Terms and Privacy, and new accounts are always
+  shoppers — selling requires the /vendor-register application.
+* "Continue with Google" mints the same local demo session and says so in the
+  UI: "Simulated for this demo — no Google account is contacted." There is no
+  OAuth client, and pretending otherwise would be the dishonest option.
+
+NEW ROUTES:
+* /orders — history scoped to the signed-in shopper, 6-step tracking rail built
+  from the canonical orderFlow, expandable detail with items, address and
+  payment, cancel for pre-shipment orders, buy-it-again, filter tabs with counts.
+* /account — profile editing, address book with Indian PIN/phone validation and
+  default handling, wishlist with bulk add-to-cart, and a security tab.
+* /notifications — derived from real state, not a hardcoded feed. Order status,
+  price drops on wishlisted items, low/out-of-stock on saved items, plus the
+  Festive Week campaign. Read state persists; the header bell badge is computed
+  by the same function so the two cannot disagree.
+* /vendor-register — 4-step seller application with real GSTIN and PAN format
+  validation, reference number on submit, Pending Verification state matching
+  seeded sellers v7/v8.
+* /vendor — seller dashboard on the existing role-gated DashShell: overview with
+  stats and a CSS bar chart, order queue with status advance, listings table,
+  payouts with the 8% commission maths.
+* /privacy, /terms, /returns, /seller-policy — four policy documents sharing a
+  LegalPage shell with per-page TOC and sibling navigation.
+
+WIRING: header bell now goes to /notifications with a real unread badge (it
+previously pointed at /account with a permanently-lit dot); footer legal line is
+now four real links instead of plain text; account dropdown gained Notifications
+and swaps "Vendor dashboard" for "Sell on MarketHub" for non-sellers.
+
+SECURITY DECISIONS — recorded deliberately:
+
+1. ORDER SCOPING. /orders and /notifications filter to the signed-in shopper.
+   The seeded orders belong to a named customer, so without this every new
+   signup would read one customer's purchase history. Documented in-code as a
+   privacy-hygiene measure, NOT an authorization boundary — the orders array is
+   localStorage in the visitor's own browser, so there is no server withholding
+   anything. VERIFIED in real Chrome: signing in as a second account in the same
+   browser shows "No orders yet" and leaks no order id, including on the
+   notifications page.
+
+2. OPEN REDIRECT GUARD. /login takes ?redirect= so gated pages can bounce and
+   return. That value is attacker-controlled, so safeRedirect() accepts only
+   single-slash absolute paths — rejecting https://, protocol-relative //host,
+   and /\host, which some browsers normalise to an external origin. Without it
+   MarketHub's own sign-in page becomes a credible phishing hop. VERIFIED
+   against 4 hostile values; all stayed on-origin, and /orders still works.
+
+3. NO BANK DETAILS ON THE SELLER FORM. /vendor-register asks for GSTIN and PAN
+   but never an account number or IFSC, and says why on the form. Payout details
+   are described as collected after approval over a verified channel. The
+   payouts tab states that bank details are not readable from the browser at
+   all, not even masked.
+
+4. SELLER ORDER VIEW IS MINIMAL. The vendor order table shows destination city
+   and order contents, not the shopper's full address or profile. Seller Policy
+   section "Shopper data you receive" states the same rule in words.
+
+5. noindex, nofollow on /account, /orders, /notifications and /vendor. Personal
+   and seller data should not be in a search index.
+
+6. LOGOUT CLEARS ADDRESSES as well as the session — postal addresses and phone
+   numbers in localStorage on a possibly-shared machine should not survive a
+   sign-out.
+
+7. THE SECURITY TAB SAYS THE QUIET PART. Rather than render a password form that
+   implies protection, /account?tab=security carries a warning that sign-in
+   verifies no password and the session is a plain localStorage object, so the
+   role gates are navigation rather than security. The same honesty appears on
+   the login panel and in every policy page's "demonstration document" banner.
+
+TYPECHECK WENT 22 -> 11. The 10 StoreLayout errors and 1 checkout error were
+unresolved Link targets pointing at these very routes; creating them fixed all
+11. The remaining 11 are entirely src/components/ui/chart.tsx (10) and
+calendar.tsx (1) — stale shadcn wrappers versus the installed recharts and
+react-day-picker majors, imported by no route. ZERO errors in any file written
+or touched this turn.
+
+VERIFIED, not assumed:
+* 25 HTTP route probes: every route 200, no error page, no accidental 404.
+  /nope-404 correctly 404s.
+* 22 real-Chrome CDP checks across signed-out, shopper and seller sessions,
+  asserting actual rendered text. All passed. Highlights: a shopper hitting
+  /vendor gets "Restricted area" (role gate holds); the seller dashboard
+  resolves to Nordic Sound Co. and renders SKU MH-P1-ELE; notifications
+  correctly derives "Saved item out of stock" from the wishlisted p5 laptop.
+* 9 real-Chrome security checks (order scoping, open redirect) — all passed.
+* Browser verification was necessary because an SSR fetch cannot exercise these
+  pages: auth is client-side, so /vendor server-renders as a 3.3 KB blank shell.
+* npm test 1/1, npm run build exit 0.
+
+Two corrections made during the work:
+* Put LEGAL_PAGES in LegalPage.tsx, which StoreLayout then imported for the
+  footer — but LegalPage renders inside StoreLayout, making the two modules
+  circular. Moved the constant to src/lib/legal.ts.
+* First typecheck after writing the routes reported 65 errors. Cause was the
+  stale src/routeTree.gen.ts, not the new code; the TanStack plugin regenerates
+  it on build. Re-ran the build, then re-checked: 11.
+
+Agent Response Summary:
+Nine routes built and wired, plus the auth fix that made the gated three
+reachable at all. Order history is scoped per account and the login redirect is
+validated against same-site paths, both verified in a real browser rather than
+asserted. Typecheck halved from 22 to 11 because the new routes resolved every
+dead Link in StoreLayout and checkout; the residue is two unused shadcn
+wrappers. Every page states plainly where it is a demo rather than implying
+security or commerce it does not have.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* src/routes/orders.tsx (Created)
+* src/routes/account.tsx (Created)
+* src/routes/notifications.tsx (Created)
+* src/routes/vendor.tsx (Created)
+* src/routes/vendor-register.tsx (Created)
+* src/routes/privacy.tsx (Created)
+* src/routes/terms.tsx (Created)
+* src/routes/returns.tsx (Created)
+* src/routes/seller-policy.tsx (Created)
+* src/components/mh/RequireAuth.tsx (Created)
+* src/components/mh/LegalPage.tsx (Created)
+* src/lib/legal.ts (Created)
+* src/lib/notifications.ts (Created)
+* src/components/auth/AuthPanel.tsx (Modified — real sign-in, role picker, honest Google button)
+* src/routes/login.tsx (Modified — validated ?redirect and ?mode search params)
+* src/components/mh/StoreLayout.tsx (Modified — bell to /notifications with real badge, footer legal links, dropdown)
+* src/components/mh/DashShell.tsx (Modified — search-param nav items)
+* src/lib/store.tsx (Modified — updateUser, addresses, updateOrder, readNotices)
+* src/routeTree.gen.ts (Modified — regenerated by the TanStack Start vite plugin)
+* docs/logs.txt (Modified)
+
+Created and removed within this turn (temporary verification only):
+* verify-pages.mjs, verify-security.mjs (headless-Chrome CDP drivers)
+* verify.txt, vsec.txt, tc.txt
+
+Actions Taken:
+* Read StoreLayout, DashShell, AuthPanel, ui.tsx, login.tsx, store.tsx and the
+  checkout order-creation block before writing anything
+* Discovered and fixed the AuthPanel sign-in gap
+* Extended src/lib/store.tsx with updateUser, an address book, updateOrder and
+  notification read state, all persisted under the existing storage key
+* Authored 9 routes, 2 shared components and 2 lib modules
+* Regenerated the route tree via npm run build; 17 routes now registered
+* 25 HTTP route probes against a dev server on port 3100
+* 22 CDP rendering checks and 9 CDP security checks in real headless Chrome
+* npm run typecheck (22 -> 11, 0 in new code), npm test 1/1, npm run build exit 0
+* Stopped the dev server and deleted every temporary file
+
+STILL OUTSTANDING after this turn:
+1. metadata/team.yaml and metadata/submission.yaml are both still EMPTY. This is
+   the submission-blocking item with under 14 hours to the deadline.
+2. docs/APPROACH.md is still the template.
+3. /admin console is not built. The role picker no longer offers Admin, so
+   nothing links to it, but src/components/ui/chart.tsx would be the natural
+   home for its charts and is currently type-broken.
+4. 9 commits unpushed; origin/Frontend still sits at the "test" commit.

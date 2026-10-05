@@ -4,7 +4,29 @@ import { AuthPanel, type AuthMode } from "@/components/auth/AuthPanel";
 import { CharacterScene, type CharacterState } from "@/components/auth/CharacterScene";
 import hero from "@/assets/hero.jpg";
 
+type Search = { redirect?: string; mode?: AuthMode };
+
+/**
+ * Only same-site absolute paths are accepted as a post-login destination.
+ *
+ * `redirect` arrives in the URL, so it is attacker-controlled: a link like
+ * /login?redirect=https://evil.example would otherwise turn MarketHub's own
+ * sign-in page into a credible phishing hop. Anything that is not a single-slash
+ * absolute path is dropped, which also rejects protocol-relative `//host` and
+ * `/\host` forms that some browsers normalise to an external origin.
+ */
+function safeRedirect(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  if (!value.startsWith("/")) return undefined;
+  if (value.startsWith("//") || value.startsWith("/\\")) return undefined;
+  return value;
+}
+
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>): Search => ({
+    redirect: safeRedirect(s.redirect),
+    mode: s.mode === "signup" ? "signup" : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Sign in — MarketHub" },
@@ -52,7 +74,8 @@ function StageBackdrop() {
 }
 
 function AuthPage() {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<AuthMode>(search.mode ?? "login");
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
 
@@ -79,6 +102,7 @@ function AuthPage() {
             passwordVisible={passwordVisible}
             onToggleVisible={() => setPasswordVisible((v) => !v)}
             onPasswordFocus={setPasswordFocused}
+            redirect={search.redirect ?? ""}
           />
         </section>
       </div>

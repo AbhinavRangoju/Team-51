@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, Heart, Home, LayoutGrid, LogOut, Menu, Package, Search, ShoppingBag, Store, User, X, Shield } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Bell, Heart, Home, LayoutGrid, LogOut, Menu, Package, Search, ShoppingBag, Store, User, X } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { LEGAL_PAGES } from "@/lib/legal";
+import { buildNotices, unreadCount } from "@/lib/notifications";
 import { useStore } from "@/lib/store";
 import { Logo } from "./ui";
 import { AIAssistant } from "./AIAssistant";
@@ -41,9 +43,17 @@ function SearchBox({ className, onDone }: { className?: string; onDone?: () => v
 }
 
 function Header() {
-  const { cart, wishlist, user, logout } = useStore();
+  const { cart, wishlist, user, logout, orders, readNotices } = useStore();
   const [menu, setMenu] = useState(false);
   const count = cart.filter((l) => !l.saved).reduce((s, l) => s + l.qty, 0);
+
+  // Derived from the same function the notifications page uses, so the badge
+  // and the list can never disagree. Signed-out visitors get no badge.
+  const unread = useMemo(() => {
+    if (!user) return 0;
+    const mine = orders.filter((o) => o.customer.trim().toLowerCase() === user.name.trim().toLowerCase());
+    return unreadCount(buildNotices(mine, wishlist), readNotices);
+  }, [user, orders, wishlist, readNotices]);
   const iconBtn = "relative grid h-10 w-10 place-items-center rounded-full transition hover:bg-surface";
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-xl">
@@ -62,7 +72,10 @@ function Header() {
         </nav>
         <SearchBox className="ml-auto hidden w-full max-w-xs md:block" />
         <div className="ml-auto flex items-center gap-0.5 md:ml-0">
-          <Link to="/account" className={`${iconBtn} hidden sm:grid`} aria-label="Notifications"><Bell className="h-[18px] w-[18px]" /><span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand" /></Link>
+          <Link to="/notifications" className={`${iconBtn} hidden sm:grid`} aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}>
+            <Bell className="h-[18px] w-[18px]" />
+            {unread > 0 && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand" />}
+          </Link>
           <Link to="/account" search={{ tab: "wishlist" }} className={`${iconBtn} hidden sm:grid`} aria-label="Wishlist">
             <Heart className="h-[18px] w-[18px]" />
             {wishlist.length > 0 && <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{wishlist.length}</span>}
@@ -84,8 +97,10 @@ function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild><Link to="/account"><User className="mr-2 h-4 w-4" />My account</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to="/orders"><Package className="mr-2 h-4 w-4" />My orders</Link></DropdownMenuItem>
-                {user.role === "vendor" && <DropdownMenuItem asChild><Link to="/vendor"><Store className="mr-2 h-4 w-4" />Vendor dashboard</Link></DropdownMenuItem>}
-                {user.role === "admin" && <DropdownMenuItem asChild><Link to="/admin"><Shield className="mr-2 h-4 w-4" />Admin console</Link></DropdownMenuItem>}
+                <DropdownMenuItem asChild><Link to="/notifications"><Bell className="mr-2 h-4 w-4" />Notifications</Link></DropdownMenuItem>
+                {user.role === "vendor"
+                  ? <DropdownMenuItem asChild><Link to="/vendor"><Store className="mr-2 h-4 w-4" />Vendor dashboard</Link></DropdownMenuItem>
+                  : <DropdownMenuItem asChild><Link to="/vendor-register"><Store className="mr-2 h-4 w-4" />Sell on MarketHub</Link></DropdownMenuItem>}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout}><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem>
               </DropdownMenuContent>
@@ -115,8 +130,8 @@ function Header() {
 function Footer() {
   const cols = [
     { title: "Marketplace", links: [["Shop all", "/shop"], ["Categories", "/categories"], ["Deals", "/deals"], ["Vendors", "/vendors"]] },
-    { title: "Support", links: [["My orders", "/orders"], ["My account", "/account"], ["Cart", "/cart"]] },
-    { title: "Sell", links: [["Become a vendor", "/vendor-register"], ["Vendor dashboard", "/vendor"], ["Sign in", "/login"]] },
+    { title: "Support", links: [["My orders", "/orders"], ["My account", "/account"], ["Notifications", "/notifications"], ["Returns policy", "/returns"]] },
+    { title: "Sell", links: [["Become a vendor", "/vendor-register"], ["Vendor dashboard", "/vendor"], ["Seller policy", "/seller-policy"], ["Sign in", "/login"]] },
   ] as const;
   return (
     <footer className="mt-24 border-t border-border bg-card pb-24 md:pb-0">
@@ -138,9 +153,16 @@ function Footer() {
         ))}
       </div>
       <div className="border-t border-border">
-        <div className="container-mh flex flex-col justify-between gap-2 py-5 text-xs text-muted-foreground md:flex-row">
+        <div className="container-mh flex flex-col justify-between gap-3 py-5 text-xs text-muted-foreground md:flex-row">
           <span>© 2026 MarketHub Technologies Pvt. Ltd.</span>
-          <span>Privacy · Terms · Returns policy · Seller policy</span>
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-1.5 gap-y-1">
+            {LEGAL_PAGES.map((p, i) => (
+              <span key={p.to} className="flex gap-1.5">
+                {i > 0 && <span aria-hidden="true">·</span>}
+                <Link to={p.to} className="hover:text-foreground">{p.label}</Link>
+              </span>
+            ))}
+          </nav>
         </div>
       </div>
     </footer>

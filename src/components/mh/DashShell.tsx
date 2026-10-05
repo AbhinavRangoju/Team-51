@@ -5,7 +5,14 @@ import { useStore, type Role } from "@/lib/store";
 import { Logo } from "./ui";
 import { Button } from "@/components/ui/button";
 
-export type DashNavItem = { to: string; label: string; icon: LucideIcon; exact?: boolean };
+export type DashNavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  exact?: boolean;
+  /** Section selector for dashboards that live on one route. */
+  search?: Record<string, string>;
+};
 
 export function DashShell({ role, title, nav, children }: { role: Role; title: string; nav: DashNavItem[]; children: ReactNode }) {
   const { user, hydrated, logout } = useStore();
@@ -38,12 +45,13 @@ export function DashShell({ role, title, nav, children }: { role: Role; title: s
       </div>
       <div className="mx-4 mb-4 rounded-xl bg-surface px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</div>
       <nav className="flex-1 space-y-0.5 px-3">
-        {nav.map(({ to, label, icon: Icon, exact }) => (
+        {nav.map(({ to, label, icon: Icon, exact, search }) => (
           <Link
-            key={to}
+            key={`${to}-${label}`}
             to={to}
+            search={search}
             onClick={() => setOpen(false)}
-            activeOptions={{ exact: !!exact }}
+            activeOptions={{ exact: !!exact, includeSearch: !!search }}
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface hover:text-foreground"
             activeProps={{ className: "!bg-primary !text-primary-foreground" }}
           >
