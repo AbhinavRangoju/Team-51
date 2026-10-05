@@ -1434,3 +1434,69 @@ Actions Taken:
 * git ls-files --error-unmatch .env — not tracked
 * git push origin Frontend — pushed 2a7d59a..19b34c6
 * git fetch origin; git rev-parse Frontend vs origin/Frontend — identical
+
+================================================================================
+[2026-10-05T21:24:00+05:30] Merge-to-main requested — main has diverged, paused for confirmation
+================================================================================
+User Prompt (verbatim):
+merge to main
+
+Agent Response:
+Did NOT merge or push. Investigated first and found main is not where we left it.
+
+State discovered after `git fetch origin`:
+* local  Frontend : 3884916  (1 ahead of origin/Frontend — the push-log commit)
+* origin Frontend : 19b34c6
+* local  main     : 6712750  (stale seed)
+* origin main     : 78eeab3  ← MOVED. "Security Architecture", also on origin/Security
+* `git merge-base --is-ancestor origin/main Frontend` → exit 1: origin/main is
+  NOT an ancestor of Frontend. The branches have DIVERGED at the seed 6712750.
+
+A teammate pushed commit 78eeab3 "Security Architecture" to origin/main (and a
+branch origin/Security) while we were working. `git show --stat 78eeab3`: it adds
+exactly one new file, SECURITY_ARCHITECTURE.md (834 lines), and nothing else.
+
+Conflict analysis:
+* Frontend contains no SECURITY_ARCHITECTURE.md (git ls-tree grep found nothing),
+  so there is zero path overlap.
+* `git merge-tree --write-tree origin/main Frontend` produced a clean result tree
+  (0272119…) with no conflict section.
+=> A merge is conflict-free and purely additive, but CANNOT be a fast-forward.
+   It requires a merge commit combining the teammate's security doc with all the
+   Frontend work.
+
+WHY I PAUSED instead of just doing it: pushing to main is team-visible, affects
+the submission branch, and main moved unexpectedly due to a teammate who is
+actively working on it. The user asked for "merge to main" before knowing a
+parallel commit existed there, and the operation is a merge commit rather than
+the simple fast-forward they likely pictured. Per the shared-branch safety rule,
+surfaced the divergence and the teammate's concurrent work and asked for explicit
+confirmation before the irreversible shared push. No force-push was ever
+considered — that would destroy the teammate's commit.
+
+Options put to the user:
+1. Local merge: merge Frontend into an up-to-date main (merge commit), push main.
+   Keeps SECURITY_ARCHITECTURE.md and adds all Frontend work. Conflict-free.
+2. Open a PR from Frontend into main on GitHub and merge there (review trail).
+3. Hold.
+
+Agent Response Summary:
+Investigation-only turn. origin/main has advanced to a teammate's "Security
+Architecture" commit (adds SECURITY_ARCHITECTURE.md) and diverged from Frontend,
+so merging needs a conflict-free merge commit rather than a fast-forward. Did not
+merge or push; paused for confirmation before writing to the shared submission
+branch, and offered a local-merge vs PR choice. Nothing on the remote changed.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git fetch origin
+* git rev-parse Frontend origin/Frontend main origin/main
+* git merge-base --is-ancestor origin/main Frontend  (exit 1 → diverged)
+* git log origin/main --oneline; git show --stat 78eeab3
+* git ls-tree -r Frontend | grep SECURITY_ARCHITECTURE  (none)
+* git merge-tree --write-tree origin/main Frontend  (clean, no conflicts)
