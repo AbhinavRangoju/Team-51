@@ -4,16 +4,16 @@
 # - If your team has 4 members: provide all 4 members.
 
 team:
-  team_id: ""
-  name: ""
-  repository: "" # URL of the newly created GitHub repository for this project
+  team_id: "51"
+  name: "Trishul"
+  repository: "https://github.com/AbhinavRangoju/Team-51.git" # URL of the newly created GitHub repository for this project
 
 members:
-  - name: ""
-    email: ""
-  - name: ""
-    email: ""
-  - name: ""
-    email: ""
-  - name: ""
-    email: ""
+  - name: "Abhinav Rangoju"
+    email: "a4rangoju@gmail.com"
+  - name: "Vivek Rajoju"
+    email: "vivek.r2801@gmail.com"
+  - name: "Rohit Bhalkikar"
+    email: "kartikeyasupe@gmail.com"
+  - name: "Mani Kanta Sarapu"
+    email: "sarapumanikanta0612@gmail.com"
