@@ -159,3 +159,34 @@ Actions Taken:
 * Ran `npm test`, `npm run typecheck`, `npm run build`
 * Started the built nitro server on port 3001 and probed it over HTTP, then shut it down
 
+--------------------------------------------------------------------------------
+[2026-10-05T14:12:40+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+9f6a20207cb8d6878931b42b8ff8ecc5fbaad06b
+
+Commit Message:
+chore: add build toolchain for TanStack Start app
+
+Branch:
+Frontend
+
+Files in commit:
+* .gitignore (Created)
+* package.json (Created)
+* package-lock.json (Created)
+* tsconfig.json (Created)
+* vite.config.ts (Created)
+* vitest.config.ts (Created)
+* docs/logs.txt (Modified)
+* src/.gitkeep (Deleted)
+* src/router.tsx, src/routeTree.gen.ts, src/server.ts, src/start.ts, src/styles.css (Created — previously untracked)
+* src/routes/__root.tsx, src/routes/index.tsx, src/routes/shop.tsx, src/routes/cart.tsx, src/routes/checkout.tsx, src/routes/product.$id.tsx, src/routes/README.md (Created — previously untracked)
+* src/components/mh/*, src/components/ui/*, src/lib/*, src/hooks/*, src/assets/*, src/test/* (Created — previously untracked)
+
+Note:
+NOT pushed. `git remote origin` still points at the Build Secure 24 starter
+repository because metadata/team.yaml has no `team.repository` value yet. Pushing
+before the remote is repointed would publish to the wrong repository. The remote
+must be set from team.yaml first.
+
