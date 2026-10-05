@@ -886,3 +886,68 @@ model's cooperation:
   unit check on wrapShopperMessage().
 * Any product ID the model returns that is not in the real catalogue is
   discarded server-side, so a fabricated ₹50 product cannot reach the UI.
+
+--------------------------------------------------------------------------------
+[2026-10-05T16:33:10+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+a7fb2a9
+
+Commit Message:
+feat(hubby): ground the AI assistant in the live catalogue via Gemini
+
+Branch:
+Frontend
+
+Files in commit (9 files changed, 1337 insertions, 63 deletions):
+* .env.example (Created)
+* src/lib/hubby/catalog.ts (Created)
+* src/lib/hubby/contract.ts (Created)
+* src/lib/hubby/prompt.ts (Created)
+* src/lib/hubby/gemini.ts (Created)
+* src/lib/hubby/offline.ts (Created)
+* src/lib/hubby/ask.ts (Created)
+* src/components/mh/AIAssistant.tsx (Modified)
+* docs/logs.txt (Modified)
+
+Deliberately excluded from the commit:
+* .env — holds the live Gemini key. Verified ignored (.gitignore:12) and absent
+  from `git status` before committing. Files were staged by name rather than
+  with `git add -A` so the exclusion is explicit rather than incidental.
+
+Working tree clean after commit. NOT yet pushed — no verified team remote
+(see resume point 1).
+
+State at pause:
+typecheck 22 errors (pre-existing baseline, 0 in new code) | npm test 1/1 |
+npm run build exit 0 | dev server stopped | all temporary probe files removed.
+
+--------------------------------------------------------------------------------
+[2026-10-05T16:34:05+05:30] CORRECTION to the COMMIT RECORD above
+--------------------------------------------------------------------------------
+The line "NOT yet pushed — no verified team remote" is WRONG. Checked properly
+after writing it:
+
+  origin  https://github.com/AbhinavRangoju/Team-51.git (fetch and push)
+  branch  Frontend, tracking origin/Frontend, currently AHEAD BY 7 COMMITS
+
+So a remote is configured and the branch has an upstream. The accurate statement
+is: not yet pushed, and the remote has been out of date since the toolchain turn.
+The 7 unpushed commits are:
+
+  a7fb2a9  feat(hubby): ground the AI assistant in the live catalogue via Gemini
+  1d818e3  feat(login): cover the auth stage with the blurred site theme
+  99dc064  feat: add /vendors directory and per-seller store view
+  fe57515  feat: add /deals page
+  bee2edd  feat: add /categories page
+  d6f1806  docs: record commit SHA for toolchain turn in logs.txt
+  9f6a202  chore: add build toolchain for TanStack Start app
+
+Not pushed in this turn because the user had just asked to pause and a push is
+visible to the whole team; left for explicit confirmation.
+
+Revised resume point 1: the git remote is FINE. What is still missing is
+metadata/team.yaml (team_id, name, repository, and exactly 2 or 4 members — all
+empty) and metadata/submission.yaml, where team_id, repository, commit_sha,
+deployment_url and submitted_at are all empty strings. Both must be filled
+before 2026-10-06T11:00:00+05:30.
