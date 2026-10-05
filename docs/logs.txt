@@ -190,3 +190,117 @@ repository because metadata/team.yaml has no `team.repository` value yet. Pushin
 before the remote is repointed would publish to the wrong repository. The remote
 must be set from team.yaml first.
 
+--------------------------------------------------------------------------------
+[2026-10-05T14:14:05+05:30] CORRECTION to the preceding COMMIT RECORD note
+--------------------------------------------------------------------------------
+The preceding note stated that `git remote origin` points at the Build Secure 24
+starter repository. That is incorrect. Verified actual remote:
+
+  origin  https://github.com/AbhinavRangoju/Team-51.git (fetch/push)
+
+So origin is already a team-owned repository, not the starter. The commits are
+therefore safe to push with:
+
+  git push origin Frontend
+
+Still outstanding: metadata/team.yaml remains empty (no team_id, name,
+repository, or member entries) and metadata/submission.yaml has no repository
+value. These must be filled before the 2026-10-06T11:00:00+05:30 deadline, and
+`team.repository` should be set to the origin URL above. Awaiting team details
+from the participant.
+
+Commit SHA for this log turn:
+d6f1806 (docs: record commit SHA for toolchain turn in logs.txt) — this
+correction block is appended after that commit and will be included in the next.
+
+================================================================================
+[2026-10-05T14:40:30+05:30] Build page 1 of 9: /categories
+================================================================================
+User Prompt (verbatim):
+There are still pages and features that are not yet build and response with a 404 not found page, Lets build one page at a time. The theme and style of the website must not change.
+
+Agent Response:
+Enumerated every route the existing UI links to but which has no file in
+src/routes/. Nine are missing:
+
+  /categories       header nav, footer, homepage hero CTA "Explore Categories"
+  /vendors          header nav, footer, homepage promo + featured vendors, product page
+  /deals            header nav, footer, homepage promo + Festive Week banner
+  /orders           footer, mobile bottom nav, user dropdown, checkout success
+  /account          header bell + wishlist icons, footer, bottom nav, dropdown
+                    (expects search param { tab: "wishlist" })
+  /login            header Sign in, mobile menu, footer
+  /vendor           user dropdown when role === "vendor", footer
+  /vendor-register  mobile menu "Sell on MarketHub", footer "Become a vendor"
+  /admin            user dropdown when role === "admin"
+
+Built /categories first. Rationale: it is the target of the homepage hero's
+secondary CTA and a primary header nav item, it has no authentication or store
+dependency, and it closes the only broken step in the otherwise working browse
+loop home -> categories -> shop -> product -> cart -> checkout.
+
+Theme preserved by composing existing primitives only — no new CSS, no new
+tokens, no changes to styles.css or any shared component:
+* StoreLayout wrapper, container-mh, card-mh, shadow-lift
+* EmptyState, SectionHeader, Stars from src/components/mh/ui.tsx
+* Button variants brand / outline / default already defined in ui/button.tsx
+* inr() currency helper and discountPct() from lib/data.ts
+* Breadcrumb markup, h1 sizing (text-3xl md:text-4xl), pill search input and
+  pill select copied from the conventions in routes/shop.tsx
+* Section rhythm (mt-16 / mt-20) and the bg-primary stat band pattern from
+  routes/index.tsx
+
+Page contents:
+1. Breadcrumb Home / Categories, h1 "Shop by category", subtitle with live
+   counts (8 categories, 8,058 items, 6 verified sellers).
+2. Category search box plus a sort control (Most items, A to Z, Lowest price,
+   Top rated).
+3. Responsive card grid (1 / 2 / 3 columns) for all 8 categories. Each card
+   shows the banner image, catalogue item count, seller count, a derived
+   "from <price>", an average star rating, an "N on offer" brand badge when the
+   category contains discounted stock, and three product thumbnails. Each card
+   links to /shop?cat=<slug>, which the existing shop route already validates.
+4. EmptyState when the category filter matches nothing, offering both a clear
+   action and a fall-through to /shop?q=<term>.
+5. "Popular right now across categories" rail of trending products linking to
+   /product/$id.
+6. bg-primary band with derived stat tiles and a Shop everything CTA.
+7. Closing card inviting the user into the full filtered shop.
+
+All per-category figures except the headline catalogue count are derived from the
+products array at render time, so they cannot drift from the real data. The
+headline count intentionally keeps using category.count to stay consistent with
+the homepage.
+
+Every link on the new page points only at routes that already exist (/, /shop,
+/product/$id). No links to the eight still-unbuilt routes were introduced.
+
+Agent Response Summary:
+Created src/routes/categories.tsx, the first of nine missing pages, using only
+existing design primitives so the visual theme is unchanged. Verified it renders
+server-side with HTTP 200, all eight categories present, eight valid /shop?cat=
+links, and five offer badges matching the five categories that actually contain
+discounted products. The new file is type-clean and it cleared the
+index.tsx(65,65) "/categories" router type error. Remaining typecheck failures
+all trace to the eight routes still to be built.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* src/routes/categories.tsx (Created)
+* src/routeTree.gen.ts (Modified — regenerated automatically by the TanStack Start vite plugin)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read src/components/mh/ui.tsx, StoreLayout.tsx, src/lib/store.tsx, src/lib/data.ts, src/components/ui/button.tsx to map the design system and data model
+* Read src/routes/index.tsx, shop.tsx, cart.tsx for page structure conventions
+* Read src/styles.css (tokens, @utility container-mh and card-mh definitions)
+* Grepped StoreLayout, footer, bottom nav and dropdown for the full list of unbuilt route targets
+* Authored src/routes/categories.tsx
+* HTTP-probed /categories: 200, title "All categories — MarketHub", no error page, all 8 category headings present, 8 /shop?cat= links, 5 offer badges, 13 rupee amounts
+* Confirmed no links to unbuilt routes originate from the new page (the /deals, /vendors, /orders, /account, /login, /vendor-register hrefs in the HTML all come from the shared StoreLayout chrome)
+* `npm run typecheck` — zero errors in categories.tsx; index.tsx(65,65) "/categories" error resolved
+* `npm test` — 1/1 passing
+* `npm run build` — exit 0; route code-split to .output/public/assets/categories-DLQdGBbb.js (8.57 kB, 2.87 kB gzip)
+
