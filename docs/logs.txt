@@ -1233,3 +1233,49 @@ STILL OUTSTANDING after this turn:
    nothing links to it, but src/components/ui/chart.tsx would be the natural
    home for its charts and is currently type-broken.
 4. 9 commits unpushed; origin/Frontend still sits at the "test" commit.
+
+--------------------------------------------------------------------------------
+[2026-10-05T21:07:10+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+aac16ce
+
+Commit Message:
+feat: add account, orders, vendor, notifications and policy pages
+
+Branch:
+Frontend
+
+Files in commit (20):
+* src/routes/orders.tsx (Created)
+* src/routes/account.tsx (Created)
+* src/routes/notifications.tsx (Created)
+* src/routes/vendor.tsx (Created)
+* src/routes/vendor-register.tsx (Created)
+* src/routes/privacy.tsx (Created)
+* src/routes/terms.tsx (Created)
+* src/routes/returns.tsx (Created)
+* src/routes/seller-policy.tsx (Created)
+* src/components/mh/RequireAuth.tsx (Created)
+* src/components/mh/LegalPage.tsx (Created)
+* src/lib/legal.ts (Created)
+* src/lib/notifications.ts (Created)
+* src/components/auth/AuthPanel.tsx (Modified)
+* src/routes/login.tsx (Modified)
+* src/components/mh/StoreLayout.tsx (Modified)
+* src/components/mh/DashShell.tsx (Modified)
+* src/lib/store.tsx (Modified)
+* src/routeTree.gen.ts (Modified)
+* docs/logs.txt (Modified)
+
+Working tree clean after commit. .env confirmed untracked.
+
+State: 17 routes registered | typecheck 11 errors, all in two unused shadcn
+wrappers, 0 in new code | npm test 1/1 | npm run build exit 0 | 25 HTTP probes,
+22 CDP render checks and 9 CDP security checks all passing.
+
+Routes now built (17): / /shop /categories /deals /vendors /product/$id /cart
+/checkout /login /orders /account /notifications /vendor /vendor-register
+/privacy /terms /returns /seller-policy
+
+Not built: /admin (no longer linked from anywhere).
