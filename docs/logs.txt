@@ -1370,3 +1370,128 @@ branch Frontend is:
   67d088c  chore(metadata): record Team 51 (Trishul) details and repository
 
 Working tree clean. This is the last commit before any push.
+================================================================================
+[2026-10-05T23:25:15+05:30] Frontend status check — install, typecheck, test, build, run
+================================================================================
+User Prompt (verbatim):
+What is status of the frontend part run if possible
+
+Agent Response:
+Ran it. The frontend is in good working order on this machine.
+
+FIRST BLOCKER: node_modules was absent — this is a fresh checkout on Abhinav's
+machine (c:\Users\a4ran\...), while the app was authored on a teammate's machine.
+Resolved with `npm ci` (lockfile-exact, no version drift): 343 packages added,
+344 audited, 0 vulnerabilities, 14s. Toolchain: Node v24.13.0, npm 11.6.2.
+
+DEV SERVER — RUNNING:
+  Command : npm run dev (vite dev)
+  URL     : http://localhost:3000/
+  Startup : VITE v8.3.2 ready in 1277 ms
+  Status  : alive and serving 200 at end of turn
+
+TYPECHECK — 11 errors, all pre-existing and inert:
+  10  src/components/ui/chart.tsx
+   1  src/components/ui/calendar.tsx
+  These are stale shadcn wrappers versus the installed recharts and
+  react-day-picker majors. Neither file is imported by any route. The count
+  matches the figure recorded in the 21:05:30 turn exactly, so nothing regressed.
+  Re-ran after the branch switch to Security — still 11, same two files.
+
+TESTS — PASSING but thin:
+  npx vitest --run -> 1 file passed, 1 test passed, 2.18s
+  Only src/test/app-routing.test.tsx exists (plus src/test/setup.ts). One test
+  across 17 routes is very light coverage; flagged to the participant.
+
+PRODUCTION BUILD — SUCCEEDS:
+  npm run build -> exit 0, .output generated via nitro, 134 files / 3.6 MB.
+  Previewable with npx vite preview.
+  Only warnings are [MODULE_LEVEL_DIRECTIVE] "use client" notices from
+  lucide-react — upstream package noise, not our code, harmless when bundling.
+  NOTE: the FIRST build attempt died with no output and exit -1. Root cause
+  identified, not guessed: a teammate checked out main, then Security, then
+  committed a merge while that build was running, so source files changed
+  underneath Vite mid-build. The re-run on the settled tree succeeded.
+
+ROUTE PROBES — 18/18 serve correctly, verified over real HTTP with SSR titles
+asserted (not assumed from source):
+  /                200  MarketHub — Everything you want, from sellers you trust
+  /shop            200  Shop all products — MarketHub
+  /categories      200  All categories — MarketHub
+  /deals           200  Festive Week deals — MarketHub
+  /vendors         200  Verified sellers — MarketHub
+  /cart            200  Your cart — MarketHub
+  /checkout        200  Checkout — MarketHub
+  /login           200  Sign in — MarketHub
+  /account         200  My account — MarketHub
+  /orders          200  My orders — MarketHub
+  /notifications   200  Notifications — MarketHub
+  /vendor          200  Vendor dashboard — MarketHub  (3.3 KB — role gate for a
+                        signed-out visitor, as designed; other pages are 16-105 KB)
+  /vendor-register 200  Sell on MarketHub — become a verified vendor
+  /privacy         200  Privacy Policy — MarketHub
+  /terms           200  Terms of Use — MarketHub
+  /returns         200  Returns Policy — MarketHub
+  /seller-policy   200  Seller Policy — MarketHub
+  /product/p1      200  Aura ANC Wireless Headphones — MarketHub
+  /nope-404        404  (correctly rejected, no soft-404)
+
+CODEBASE SHAPE: src/ = 20 routes files (17 routes + __root + README), 55
+components, 14 lib modules, 12 assets, 1 hook, 2 test files.
+
+GIT STATE CHANGED MID-TURN — surfaced to the participant:
+  A teammate switched branches and merged while this status check was running.
+  Reflog confirms deliberate human action, NOT repository corruption:
+    af504a1 (Frontend) -> checkout main -> checkout Security -> merge commit
+    2b5d791 "Merge remote-tracking branch 'origin/Frontend' into Security"
+  Resulting state:
+    HEAD              : Security @ 2b5d791, 15 commits ahead of origin/Security
+    Frontend (local)  : af504a1, 4 commits ahead of origin/Frontend, UNPUSHED
+    origin/Security   : 78eeab3 (identical to origin/main) — Security is unpushed
+  CONSEQUENCE THE TEAM MUST KNOW: the merge took origin/Frontend (19b34c6), not
+  local Frontend (af504a1), so the four log commits from the previous turn are
+  NOT in Security. They still exist (verified via git cat-file) and sit only on
+  the local Frontend branch. Nothing is lost, but nothing is shared either.
+
+src/routeTree.gen.ts shows as modified. The content diff is EMPTY — it is purely
+an LF-to-CRLF line-ending artifact from the dev server regenerating the file on
+Windows. Deliberately NOT committed: a CRLF-only commit would hand teammates a
+pointless merge conflict.
+
+Agent Response Summary:
+Installed the missing dependencies with npm ci and brought the frontend up: dev
+server live on http://localhost:3000/, production build exit 0, 1/1 tests
+passing, and all 18 HTTP route probes returning the correct SSR titles with
+/nope-404 properly 404ing. Typecheck sits at 11 pre-existing errors confined to
+two unused shadcn wrapper files, unchanged from the previous turn. Diagnosed the
+first failed build as a teammate's mid-build branch switch rather than a code
+fault, and flagged that the Security branch merged origin/Frontend instead of
+local Frontend, leaving the previous turn's four log commits unpushed on
+Frontend only.
+
+Commit SHA:
+<PENDING_TURN_2>
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+* node_modules/ (Created — 343 packages via npm ci, git-ignored, not committed)
+* .output/ (Created — production build artifacts, git-ignored, not committed)
+* src/routeTree.gen.ts (regenerated by dev server; empty content diff, line
+  endings only; intentionally left uncommitted)
+
+Actions Taken:
+* Read package.json and enumerated src/ route files and folder counts
+* Detected missing node_modules; ran npm ci (343 packages, 0 vulnerabilities)
+* Started background dev server: npm run dev -> http://localhost:3000/
+* Ran npx tsc --noEmit twice (before and after the branch switch) — 11 errors
+  both times, grouped by file
+* Ran npx vitest --run — 1 file / 1 test passed
+* Ran npm run build — first attempt exit -1 during a concurrent branch switch,
+  re-run exit 0 with nitro output
+* Probed 19 URLs with Invoke-WebRequest, asserting status codes and <title>
+* Ran git rev-parse, git branch -vv --all, git cat-file -t, git reflog -12 to
+  diagnose the mid-turn branch change and confirm no commits were lost
+* Inspected git diff of src/routeTree.gen.ts — confirmed empty content diff
+* Removed the temporary build-status.log capture file
+* Appended this turn entry to docs/logs.txt
+
