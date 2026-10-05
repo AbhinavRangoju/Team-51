@@ -7,3 +7,155 @@ Lifecycle: Append-Only (Maintained autonomously by AI Agent)
 Timeline: ISO-8601 with local timezone offset
 ================================================================================
 
+================================================================================
+[2026-10-05T13:00:22+05:30] Onboarding gate triggered — request to run the project
+================================================================================
+User Prompt (verbatim):
+Run the project
+
+Agent Response:
+Read AGENTS.md in full. docs/logs.txt contains no `AGREEMENT RECORDED:` line for
+repo root c:\Users\manik\OneDrive\Desktop\Team-51, so the §3 onboarding flow is
+required before any project task is executed. Presented the greeting, system time,
+hackathon window, deadline, remaining time, and recited the five ground rules
+verbatim. Requested the exact confirmation string `I agree`.
+
+Separately, inspected the repository to answer the run request. src/ holds a
+TanStack Start (React 19 + Vite) application: src/server.ts, src/start.ts,
+src/router.tsx, src/routeTree.gen.ts, src/styles.css, src/routes/ (__root, index,
+shop, cart, checkout, product.$id), src/components/mh/, src/components/ui/
+(shadcn), src/lib/, src/hooks/, src/assets/, src/test/. However the build
+toolchain is entirely absent — there is no package.json, vite.config.*,
+tsconfig*.json, index.html, lockfile, or node_modules anywhere in the workspace.
+Verified via recursive search. Toolchain available locally: Node v24.14.1,
+npm 11.11.0. The project therefore cannot be started in its current state; a
+manifest, Vite config, and TypeScript config must be authored first, then
+dependencies installed. Did not scaffold these files because the onboarding gate
+is still closed and because scaffolding was not explicitly requested.
+
+Agent Response Summary:
+Enforced the AGENTS.md §3 onboarding gate (no prior agreement on record) and asked
+the user for the `I agree` confirmation. Investigated the run request read-only and
+determined the app is a TanStack Start project whose entire build toolchain
+(package.json, Vite config, TS config, lockfile, node_modules) is missing, so no
+dev server command exists to execute. Reported the blocker and the two choices
+available: scaffold the toolchain, or point the agent at an existing manifest.
+No application files were created or modified this turn.
+
+Commit SHA:
+(not committed — onboarding turn, only docs/logs.txt touched; commit deferred per §3)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read AGENTS.md, README.md, docs/logs.txt, docs/APPROACH.md, metadata/team.yaml, TEST.md, src/routes/README.md
+* Read src/server.ts, src/start.ts
+* Listed src/, src/routes/, src/test/ directory trees
+* Ran recursive search for package.json / vite.config.* / tsconfig*.json / index.html / lockfiles — zero results
+* Ran `git status --short`, `git log --oneline`, `git ls-files` — src/ contents are untracked; branch is `Frontend`
+* Ran `node -v` (v24.14.1), `npm -v` (11.11.0), captured system time and timezone (India Standard Time)
+
+================================================================================
+[2026-10-05T13:04:10+05:30] ONBOARDING COMPLETE
+================================================================================
+AGREEMENT RECORDED: c:\Users\manik\OneDrive\Desktop\Team-51
+Agent: Kiro (Claude Opus 5)
+System Time: 2026-10-05T13:04:10+05:30
+Deadline: 2026-10-06T11:00:00+05:30
+
+================================================================================
+[2026-10-05T14:10:05+05:30] Scaffold missing build toolchain and run the app
+================================================================================
+User Prompt (verbatim):
+i agree, Go with path 1
+
+Agent Response:
+Agreement recorded (see ONBOARDING COMPLETE block above). Executed path 1:
+authored the absent build toolchain for the existing TanStack Start application
+in src/, installed dependencies, and brought the app up.
+
+Toolchain authored:
+* package.json — scripts dev / build / start / preview / test / test:watch /
+  typecheck; Node >=20 engine floor.
+* vite.config.ts — plugins tailwindcss(), tanstackStart({ srcDirectory: "src" }),
+  viteReact(), nitro(); dev server pinned to port 3000; explicit
+  resolve.alias "@" -> ./src.
+* tsconfig.json — strict, bundler module resolution, react-jsx, "@/*" -> "./src/*".
+* vitest.config.ts — jsdom environment, setupFiles ./src/test/setup.ts, same "@"
+  alias; kept separate from vite.config.ts so the app build never loads vitest.
+* .gitignore — excludes node_modules/, .output/, .nitro/, dist/, and .env* while
+  allowing .env.example, so secrets cannot be committed.
+
+Two failures hit and corrected during bring-up:
+1. First boot on Vite 7 could not resolve any "@/..." import. Cause:
+   resolve.tsconfigPaths is a Vite 8 feature and was silently inert on 7.
+   Also surfaced "nitro vite builder requires ^8".
+2. Fix: upgraded to vite@^8 and @vitejs/plugin-react@^6 (plugin-react 6 peers
+   vite ^8), and replaced resolve.tsconfigPaths with an explicit resolve.alias so
+   dev, build, and vitest all resolve "@" identically regardless of Vite version.
+
+Resolved versions: vite 8.3.2, @vitejs/plugin-react 6.1.1,
+@tanstack/react-start 1.168.60, @tanstack/react-router 1.170.41,
+@tanstack/react-query 5.104.1, react/react-dom 19.3.0, tailwindcss 4.3.3,
+nitro 3.0.260903-beta, vitest 4.1.11, typescript 5.9.3. npm audit: 0 vulnerabilities.
+
+Verification performed:
+* Dev server (`npm run dev`) boots clean on http://localhost:3000 with no resolve
+  errors. SSR routes return HTTP 200 with correct rendered <title>: / , /shop,
+  /cart, /checkout, /product/p1, /product/p2, /product/p3.
+* /product/1 returns 404 — correct behaviour, product ids are p1..pN and the
+  loader throws notFound() for unknown ids. /does-not-exist returns 404 via the
+  root notFoundComponent.
+* `npm test` — 1 test file, 1 test, passed (vitest 4.1.11).
+* `npm run build` — exit 0, generated .output/nitro.json and
+  .output/server/index.mjs. Only benign MODULE_LEVEL_DIRECTIVE "use client"
+  warnings from lucide-react.
+* Production server (`node .output/server/index.mjs`, PORT=3001) returns HTTP 200
+  with correct titles for /, /shop, /product/p1.
+
+Outstanding issues NOT introduced by the toolchain and NOT fixed (left for the
+team to decide):
+* `npm run typecheck` fails. Eight routes are linked from the UI but do not exist
+  in src/routes/: /categories, /vendors, /deals, /orders, /account, /login,
+  /vendor, /vendor-register. TanStack Router's typed Link rejects them. These are
+  real runtime 404s, not just type noise.
+* src/components/ui/chart.tsx and src/components/ui/calendar.tsx have type
+  mismatches against the installed recharts and react-day-picker majors. Neither
+  file is imported by any route, so neither affects the running app.
+
+Agent Response Summary:
+Authored package.json, vite.config.ts, tsconfig.json, vitest.config.ts, and
+.gitignore for the pre-existing TanStack Start app, installed 344 packages with
+zero reported vulnerabilities, and verified the app end to end in both dev and
+production modes. Key decision: moved to Vite 8 because the nitro build plugin
+and @vitejs/plugin-react 6 both require it, and used an explicit resolve.alias
+rather than resolve.tsconfigPaths so path resolution is version-independent.
+Relaxed three strict tsconfig flags (noUncheckedIndexedAccess,
+verbatimModuleSyntax) that the existing source was not authored against, rather
+than editing application code that was not in scope. Reported the eight missing
+routes and two stale shadcn wrappers without changing them.
+
+Commit SHA:
+(recorded in the following turn entry — see git log for commit "chore: add build toolchain for TanStack Start app")
+
+Files Modified / Created:
+* package.json (Created)
+* package-lock.json (Created)
+* vite.config.ts (Created)
+* vitest.config.ts (Created)
+* tsconfig.json (Created)
+* .gitignore (Created)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Scanned every import in src/**/*.{ts,tsx} to derive the exact dependency set
+* Queried the npm registry for versions and peer ranges of vite, @vitejs/plugin-react, @tanstack/react-start, @tanstack/router-plugin, @tailwindcss/vite, vitest
+* Confirmed the canonical Start vite config shape against the TanStack router start-basic example
+* `npm install` runtime deps (react, react-dom, 26 @radix-ui packages, tanstack router/start/query, recharts, lucide-react, sonner, vaul, cmdk, embla-carousel-react, input-otp, react-day-picker, react-hook-form, react-resizable-panels, class-variance-authority, clsx, tailwind-merge, tw-animate-css)
+* `npm install -D` build/test deps (vite, @vitejs/plugin-react, tailwindcss, @tailwindcss/vite, nitro, typescript, @types/*, vitest, jsdom, @testing-library/jest-dom)
+* Started `npm run dev`, diagnosed the "@/" resolve failure, upgraded to vite@^8 + plugin-react@^6, switched to explicit resolve.alias, restarted
+* Probed /, /shop, /cart, /checkout, /product/p1..p3, /does-not-exist over HTTP and asserted status codes and rendered titles
+* Ran `npm test`, `npm run typecheck`, `npm run build`
+* Started the built nitro server on port 3001 and probed it over HTTP, then shut it down
+
