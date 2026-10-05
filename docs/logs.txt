@@ -304,3 +304,103 @@ Actions Taken:
 * `npm test` — 1/1 passing
 * `npm run build` — exit 0; route code-split to .output/public/assets/categories-DLQdGBbb.js (8.57 kB, 2.87 kB gzip)
 
+--------------------------------------------------------------------------------
+[2026-10-05T14:41:15+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+bee2edd
+
+Commit Message:
+feat: add /categories page
+
+Branch:
+Frontend
+
+Files in commit:
+* src/routes/categories.tsx (Created)
+* src/routeTree.gen.ts (Modified)
+* docs/logs.txt (Modified)
+
+Remaining unbuilt routes (8):
+/vendors, /deals, /orders, /account, /login, /vendor, /vendor-register, /admin
+
+================================================================================
+[2026-10-05T14:52:10+05:30] Build page 2 of 9: /deals
+================================================================================
+User Prompt (verbatim):
+go ahead
+
+Agent Response:
+Built /deals, the second of the nine missing routes, continuing the agreed order
+(pure-browse pages first, auth-dependent pages later).
+
+Theme preserved — no new CSS, no token changes, styles.css untouched, no shared
+component modified. Composed from existing primitives only:
+* StoreLayout, container-mh, card-mh, shadow-lift
+* ProductCard (already renders the -N% brand badge and the "Only N left" warning)
+* Price, Stars, SectionHeader, EmptyState from components/mh/ui.tsx
+* Button variants brand / outline, and the filter-chip pattern lifted verbatim
+  from the rating chips in routes/shop.tsx
+* The bg-primary banner and bg-primary-foreground/10 stat-tile pattern from the
+  Festive Week block on routes/index.tsx
+* inr(), discountPct() from lib/data.ts; useStore + sonner toast for add-to-cart,
+  matching ProductCard's existing behaviour
+
+Page contents:
+1. Breadcrumb Home / Deals.
+2. bg-primary hero reading "Festive Week. Up to 40% off." — the 40 is derived
+   from the real maximum discount, not hardcoded, as is the live offer count.
+3. A four-tile live countdown (Days / Hours / Mins / Secs) to the end of the
+   coming Sunday.
+4. "Deal of the day" spotlight: the deepest discount that is actually in stock,
+   with image, vendor, rating, Price primitive, explicit rupee saving,
+   description, and a working add-to-cart.
+5. Full offer grid with two chip filter rows (discount tier: All / 20%+ / 30%+ /
+   40%+, and category) plus a sort control (Biggest discount, Biggest saving,
+   price both ways, Top rated).
+6. EmptyState for over-narrow filter combinations.
+7. "Going fast at this price" strip for discounted items with stock under 10.
+8. Closing card showing combined markdown across all live offers.
+
+Two implementation notes worth recording:
+
+* SSR-safe clock. The countdown deliberately renders "--" on the server and only
+  begins ticking inside useEffect after mount. Rendering a real clock during SSR
+  would hydrate into a React mismatch as soon as server and client disagree by
+  one second. Verified: the server HTML contains exactly 4 "--" placeholders.
+* Non-expiring deadline. endOfFestiveWeek() computes the end of the coming
+  Sunday relative to now rather than using a fixed date, so the countdown stays
+  meaningful whenever the page is opened instead of going negative after a fixed
+  day. Also guards against a zero-length window by rolling forward a week.
+
+Every link points only at routes that exist: /, /shop, /categories (built last
+turn), /cart, /product/$id. No links to the seven still-unbuilt routes.
+
+Agent Response Summary:
+Created src/routes/deals.tsx using only existing design primitives, so the visual
+theme is unchanged. All nine discounted products render with their correct
+markdown tiers (11, 21, 24, 30, 31 and 40 percent), the spotlight correctly
+selects the 40%-off item that still has stock, and the countdown is SSR-safe.
+deals.tsx is type-clean and the "/deals" router type errors in index.tsx are
+resolved. Seven routes remain: /vendors, /orders, /account, /login, /vendor,
+/vendor-register, /admin.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* src/routes/deals.tsx (Created)
+* src/routeTree.gen.ts (Modified — regenerated automatically by the TanStack Start vite plugin)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read src/components/mh/ProductCard.tsx to reuse the existing card rather than restyling one
+* Authored src/routes/deals.tsx
+* HTTP-probed /deals: 200, title "Festive Week deals — MarketHub", no error page
+* Asserted all 9 discounted products present in the rendered HTML (Aura ANC, Velocity Run 3, Mira Leather, Tessera Air 14, Radiant Vitamin C, Pulse 2, Cork Yoga, Oat Merino, Studio Wireless)
+* Asserted the rendered discount tiers are exactly 11, 21, 24, 30, 31, 40 percent, matching the seed data
+* Asserted exactly 4 countdown "--" placeholders in server HTML, confirming no hydration-mismatch risk
+* Asserted 24 /product/$id links (3 spotlight + 18 grid + 3 low-stock strip)
+* `npm run typecheck` — zero errors in deals.tsx
+* `npm run build` — exit 0; code-split to .output/public/assets/deals-Bk-PRJgp.js (11.21 kB, 3.74 kB gzip)
+
