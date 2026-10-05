@@ -1279,3 +1279,82 @@ Routes now built (17): / /shop /categories /deals /vendors /product/$id /cart
 /privacy /terms /returns /seller-policy
 
 Not built: /admin (no longer linked from anywhere).
+
+================================================================================
+[2026-10-05T21:14:40+05:30] Record team metadata (Team 51 — Trishul, 4 members)
+================================================================================
+User Prompt (verbatim):
+Team ID: 51
+Team Name: Trishul
+Member 1: Abhinav Rangoju
+Email: a4rangoju@gmail.com
+Member 2: Vivek Rajoju
+Email: vivek.r2801@gmail.com
+Member 3: Rohit Bhalkikar
+Email: kartikeyasupe@gmail.com
+Member 4: Mani Kanta Sarapu
+Email: sarapumanikanta0612@gmail.com
+GitHub repository: https://github.com/AbhinavRangoju/Team-51.git
+
+Agent Response:
+Recorded the team details. Team size is 4, which satisfies the competition's
+"exactly 2 or 4" rule, so this is accepted.
+
+metadata/team.yaml now carries team_id 51, name "Trishul", the repository URL,
+and all four members:
+  1. Abhinav Rangoju  — a4rangoju@gmail.com
+  2. Vivek Rajoju     — vivek.r2801@gmail.com
+  3. Rohit Bhalkikar  — kartikeyasupe@gmail.com
+  4. Mani Kanta Sarapu — sarapumanikanta0612@gmail.com
+
+metadata/submission.yaml now carries team_id 51 and the repository URL.
+commit_sha, deployment_url and submitted_at are intentionally left empty — those
+are the final-freeze fields, filled at submission time, not now.
+
+Git remote origin already pointed at https://github.com/AbhinavRangoju/Team-51.git,
+exactly the repository given, so no `git remote set-url` was needed. Verified with
+`git remote get-url origin`.
+
+Member emails were written exactly as provided. Noted but not changed: member 3
+"Rohit Bhalkikar" was given the email kartikeyasupe@gmail.com, which does not
+obviously match the name. Recorded as-is since this is the participant's own
+registration data; flag it to the organisers if it was a paste error.
+
+Agent Response Summary:
+Filled metadata/team.yaml (team 51, Trishul, 4 members) and the team_id and
+repository fields of metadata/submission.yaml. Confirmed the git remote already
+matches the team repo, so no remote change was needed. Left the final-freeze
+submission fields empty by design.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* metadata/team.yaml (Modified)
+* metadata/submission.yaml (Modified)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Wrote metadata/team.yaml with 4 member entries and the repository URL
+* Wrote team_id and repository into metadata/submission.yaml
+* `git remote get-url origin` — confirmed it already matches the team repository
+
+--------------------------------------------------------------------------------
+[2026-10-05T21:15:20+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+445bbfa
+
+Commit Message:
+chore(metadata): record Team 51 (Trishul) details and repository
+
+Branch:
+Frontend
+
+Files in commit:
+* metadata/team.yaml (Modified)
+* metadata/submission.yaml (Modified)
+* docs/logs.txt (Modified)
+
+Working tree clean after commit. 12 commits now unpushed on Frontend; the branch
+still needs pushing and a PR into main before the deadline.
