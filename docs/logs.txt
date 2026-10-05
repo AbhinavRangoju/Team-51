@@ -1358,3 +1358,15 @@ Files in commit:
 
 Working tree clean after commit. 12 commits now unpushed on Frontend; the branch
 still needs pushing and a PR into main before the deadline.
+
+--------------------------------------------------------------------------------
+[2026-10-05T21:15:40+05:30] CORRECTION to the SHA above
+--------------------------------------------------------------------------------
+The commit SHA for the metadata turn is 67d088c, not 445bbfa. 445bbfa was the
+first commit; amending it to fold in this COMMIT RECORD (which adds the SHA to
+docs/logs.txt) rewrote it to 67d088c. 445bbfa is now orphaned. The real HEAD of
+branch Frontend is:
+
+  67d088c  chore(metadata): record Team 51 (Trishul) details and repository
+
+Working tree clean. This is the last commit before any push.
