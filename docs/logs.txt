@@ -3079,3 +3079,158 @@ This information is provided as context about user environment. Only consider it
 <file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
 </ACTIVE-EDITOR-FILE>
 </EnvironmentContext>
+
+Agent Response:
+Completed a strictly read-only audit and plan. No post-hack branch, worktree,
+application code, frontend code, dependency, architecture, metadata or
+submission file was created or changed. Verified with git diff that src,
+package.json, package-lock.json, scripts and .env.example at current HEAD match
+frozen SHA ae2fb5ccba6952dfe1be9fb6f5a572640c4e8ef6 exactly; current backend
+contains only later documentation/log commits, so post-hack work MUST NOT branch
+from current backend HEAD.
+
+Recommended separation after plan approval: create a linked worktree at
+C:\Users\Vivek\OneDrive\Desktop\Team-51-posthack with a new branch named
+post-hack/backend-completion based directly on frozen SHA ae2fb5c. That gives
+post-hack work its own physical directory and branch while preserving the frozen
+submission checkout untouched. No push until separately requested.
+
+Current backend confirmed:
+* JSON Map persistence: users, sessions, vendors, products, orders; unique email
+  and checkout-idempotency indexes; atomic write-then-rename persistence;
+  synchronous tx() boundary.
+* Eleven server functions: signup/login/logout/me; getQuote/placeOrder;
+  listMyOrders/getMyOrder/cancelOrder; getVendorDashboard/advanceVendorOrder.
+* Reusable patterns: createServerFn POST/GET, guarded() generic error boundary,
+  field allow-list validation helpers, scrypt + opaque sessions, requireUser /
+  requireRole / requireVendor / ownership guards, DTO allow-list mapping, tx(),
+  per-IP rate limits, direct backend tests and HTTP E2E security harness.
+* Client shop/products still use static lib/data.ts; cart and addresses are local
+  browser state. Backend APIs can be added without frontend redesign, but will
+  remain unintegrated until Member 3 chooses to consume them.
+
+Plan, implemented one area at a time with no frontend redesign:
+0. Boundary/baseline after approval: create isolated worktree/branch from ae2fb5c;
+   run existing tests/build; add post-hack change log. Add a strict-object
+   validation helper for NEW endpoints only so unexpected/mass-assignment keys
+   are rejected. Do not change frozen endpoint contracts initially.
+1. Product APIs: public active-product list/detail with bounded paging, allowlisted
+   q/category/vendor/price/rating/stock/sale/sort filters; own-vendor product
+   list/create/update/archive. Use server-generated product id/SKU; price in
+   validated paise; no arbitrary image URL; archive rather than hard delete to
+   preserve orders; strict ownership checks. Mandatory hardening: requireVendor
+   becomes verified/approved-only; public catalog, cart add and checkout use a
+   common sellable-product predicate so pending/rejected/suspended vendor goods
+   cannot be bought. Tests cover drafts/archives/non-verified vendors, filters,
+   cross-vendor IDOR, customer/admin denial and mass assignment.
+2. Persistent cart APIs: get/add/set-quantity/remove under the session user only;
+   max 50 lines and quantity 1-20; active/sellable product validation; no user,
+   price, total, stock or vendor fields in payload. Existing checkout contract is
+   intentionally untouched because its frontend still sends selected items;
+   future frontend integration can choose cart-backed checkout. Tests cover
+   isolation, merge/cap, archived/suspended product rejection and no price trust.
+3. Address APIs: list/create/update/delete/set-default; max ten; owner-scoped
+   lookups; first/default replacement enforced in a tx(); no userId accepted;
+   address DTO only to owner. Tests cover IDOR, default reassignment, validation
+   and PII non-leakage.
+4. Vendor application/profile: authenticated customer application, own sanitized
+   status read, verified-vendor-only profile read/update. Persist KYC PAN/GST
+   encrypted with AES-GCM using a required MH_VENDOR_PII_KEY; use normalized
+   values/masked DTOs; never trust owner/email from form, derive from session.
+   Approval/rejection is admin-only; approval creates linked vendor, changes the
+   user role, and revokes sessions; pending/rejected/suspended vendors have no
+   vendor privileges. Tests cover duplicate/pending apps, PII at-rest/DTO safety,
+   role escalation, cross-user access and session revocation.
+5. Admin APIs: requireAdmin only, no public admin creation. Bounded user list and
+   activate/suspend (not arbitrary role editing; no self-suspend); vendor app
+   list/approve/reject and vendor suspend/reinstate; product list/archive; order
+   list/detail as read-only oversight. Admin list DTOs minimize PII; detailed
+   order access is explicit and tested. Tests cover anon/customer/vendor denial,
+   no password/session leakage, admin suspension revocation, vendor approval and
+   product/order cross-tenant controls.
+6. Database decision gate: defer migration until Areas 1-5 are green. Current
+   JSON store is correct only for one process and silently starts clean if its
+   data file cannot be read, so it is unsuitable for durable multi-instance
+   production. If PostgreSQL plus a disposable test database are available,
+   migrate in a dedicated phase behind repository interfaces, using parameterized
+   SQL/migrations, DB constraints and transaction-based checkout; hash session
+   tokens at rest. Do not half-migrate or add a database dependency without that
+   environment. PostgreSQL is preferred over SQLite because it aligns with the
+   security architecture and later tenant-scoped/RLS capability.
+
+Important architecture gaps documented but NOT claimed implemented: the current
+security architecture is aspirational in areas such as MFA, audit logging,
+security headers/CORS, RLS and Redis. They are not silently added to this scope.
+The strict post-hack plan preserves current P0/P1 semantics and closes only
+necessary gaps that arise from the requested feature areas.
+
+Approval needed before any code: approve the separate linked worktree rooted at
+frozen SHA, PostgreSQL as the eventual persistence target, AES-GCM protection
+for vendor KYC fields, and starting Area 1 only. After Area 1 I will run tests,
+production build and report completed/remaining work before Area 2.
+
+Agent Response Summary:
+Produced a backend-only, one-area-at-a-time plan after inspecting the frozen
+backend, current static frontend contracts and security architecture. Recommended
+an isolated post-hack worktree from the frozen SHA, identified verified-vendor
+status enforcement as a prerequisite security hardening, and designed precise
+API/data/test boundaries for products, cart, addresses, vendor workflow, admin
+operations and an optional safe PostgreSQL migration. No application code was
+written.
+
+Commit SHA:
+(recorded in the following post-hack documentation log commit)
+
+Files Modified / Created:
+* docs/logs.txt (Modified — mandatory append-only planning record only)
+
+Actions Taken:
+* Checked current time, branch, status and frozen commit availability
+* Detected/restored a pre-existing accidental deletion of a later logs.txt entry
+* Proved application/tooling files match frozen SHA exactly
+* Read current auth, checkout, order, vendor, guard, persistence, DTO, validation,
+  seed, frontend-contract and security-architecture code read-only
+* Attempted context-gatherer; it failed due to high load, then completed direct inspection
+* Did not create a branch/worktree, edit src/, edit frontend, change dependencies or push
+
+================================================================================
+[2026-10-06T11:28:30+05:30] Quick backend completion answer
+================================================================================
+User Prompt (verbatim):
+tell me very fast, how much is backend done
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+About 65% of the full Member 1 backend scope is complete, and about 95% of the
+security-critical purchase path is complete. Complete: auth/sessions,
+authorization/ownership, secure server-side checkout, stock/idempotency, customer
+orders/cancellation, vendor dashboard/order handling, validation, CSRF, rate
+limiting, safe errors and security testing. Not complete: public product APIs and
+vendor CRUD, persistent cart/address APIs, vendor onboarding/profile backend,
+admin APIs, proper relational persistence, payment processing and live deployment.
+
+Agent Response Summary:
+Gave the concise completion figure requested, distinguishing the full Member 1
+scope from the completed security-critical core. No application code was changed.
+
+Commit SHA:
+(recorded in following log-only commit)
+
+Files Modified / Created:
+* docs/logs.txt (Modified — mandatory append-only response record)
+
+Actions Taken:
+* Reused the completed read-only backend scope audit
+* Did not modify application, frontend, architecture, metadata or submission files
