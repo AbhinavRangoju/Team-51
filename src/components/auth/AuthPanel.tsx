@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Mail, User, Loader2, Check, ShoppingBag, Store, Shield, Info } from "lucide-react";
 import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { customers, vendors } from "@/lib/data";
+import { postLoginPath } from "@/lib/onboarding-store";
 import { useStore, type Role } from "@/lib/store";
 
 export type AuthMode = "login" | "signup";
@@ -181,7 +182,12 @@ function useSignIn(redirect: string) {
   return (user: { name: string; email: string; role: Role }) => {
     login(user);
     const fallback = user.role === "vendor" ? "/vendor" : user.role === "admin" ? "/admin" : "/";
-    const to = redirect || fallback;
+    // First-run onboarding is a gate, so it outranks both the RequireAuth deep
+    // link and the role landing page. postLoginPath() only answers
+    // "/onboarding" while that run is still outstanding; once it is finished,
+    // the pre-existing destination logic applies unchanged. The flag lives in
+    // localStorage, so this is per-browser, not per-account.
+    const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
     // Let the success state render for a beat before leaving the page.
     setTimeout(() => navigate({ to, replace: true }), 600);
   };
