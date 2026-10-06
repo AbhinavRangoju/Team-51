@@ -1,8 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Mail, User, Loader2, Check, ShoppingBag, Store, Shield, Info } from "lucide-react";
+import { Eye, EyeOff, Mail, User, Loader2, Check, ShoppingBag, Info, TriangleAlert } from "lucide-react";
 import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { customers, vendors } from "@/lib/data";
-import { useStore, type Role } from "@/lib/store";
+import { login as loginFn, signup as signupFn, type PublicUser } from "@/lib/api/auth";
+import { useStore } from "@/lib/store";
 
 export type AuthMode = "login" | "signup";
 
@@ -86,86 +86,47 @@ function PrimaryButton({ loading, success, children }: { loading: boolean; succe
   );
 }
 
-const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-const fakeAuth = () => new Promise((r) => setTimeout(r, 1300));
-
-/**
- * Resolves a display name for the signed-in session.
- *
- * Seed accounts keep their real names so the demo is coherent — signing in as a
- * seeded shopper surfaces that shopper's existing orders. Anything else falls
- * back to a title-cased version of the email's local part.
- *
- * Seller emails are matched but never shown or suggested anywhere in the UI;
- * publishing them would hand over a scrapeable list of seller contacts.
- */
-function nameForEmail(email: string): string {
-  const e = email.trim().toLowerCase();
-  const customer = customers.find((c) => c.email.toLowerCase() === e);
-  if (customer) return customer.name;
-  const vendor = vendors.find((v) => v.email.toLowerCase() === e);
-  if (vendor) return vendor.owner;
-
-  const local = e.split("@")[0] ?? "";
-  const pretty = local.replace(/[._-]+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
-  return pretty || "Shopper";
-}
-
-// Admin is deliberately absent: there is no /admin console in this build, so
-// offering the role would hand the visitor a route that 404s.
-const ROLES: { value: Role; label: string; icon: typeof User }[] = [
-  { value: "customer", label: "Shopper", icon: User },
-  { value: "vendor", label: "Seller", icon: Store },
-];
-
-/**
- * Which workspace to drop into after signing in. MarketHub gates /vendor and
- * /admin on `user.role`, so without this there is no way to reach either in a
- * seeded demo that has no real identity provider behind it.
- */
-function RolePicker({ value, onChange, disabled }: { value: Role; onChange: (r: Role) => void; disabled: boolean }) {
+/** Server-side rejections: wrong credentials, duplicate email, rate limit. */
+function FormError({ message }: { message: string }) {
   return (
-    <fieldset disabled={disabled} className="space-y-1.5">
-      <legend className="text-sm font-semibold text-foreground">Sign in as</legend>
-      <div className="grid grid-cols-3 gap-2">
-        {ROLES.map(({ value: v, label, icon: Icon }) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(v)}
-            aria-pressed={value === v}
-            className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 disabled:opacity-60 ${
-              value === v
-                ? "border-brand bg-brand-soft text-brand"
-                : "border-input bg-card text-muted-foreground hover:border-foreground/25 hover:text-foreground"
-            }`}
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
-      </div>
-    </fieldset>
+    <p role="alert" className="flex items-start gap-2 rounded-xl bg-destructive/10 px-3 py-2.5 text-xs font-medium text-destructive">
+      <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+      <span>{message}</span>
+    </p>
   );
 }
 
+const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
 /**
- * States plainly that this is not real authentication.
- *
- * MarketHub has no identity provider, no password store and no server-side
- * session: `login()` writes a name, email and role into localStorage and the
- * role gates read it back. Anyone can therefore grant themselves any role from
- * devtools. That is acceptable for a demo storefront and unacceptable for
- * anything real, so the UI says so rather than implying a security property it
- * does not have.
+ * Server functions reject with an Error whose message is already safe to show —
+ * `guarded()` in src/lib/server/validate.ts only lets curated `AppError` text
+ * through and replaces anything unexpected with a generic sentence. So there is
+ * no stack trace or internal detail to filter out here, but an empty or
+ * suspiciously long message still falls back to generic copy.
  */
-function DemoAuthNotice() {
+function messageFor(error: unknown): string {
+  const raw = error instanceof Error ? error.message.trim() : "";
+  if (!raw || raw.length > 200) return "Something went wrong. Please try again.";
+  return raw;
+}
+
+/**
+ * Notes that accounts are real but the catalogue is sample data.
+ *
+ * The previous copy said no password was checked and the session lived only in
+ * the browser. Both are now false: passwords are scrypt-hashed server-side and
+ * the session is an httpOnly cookie backed by a server-side record, so the
+ * notice would have been actively misleading if left alone.
+ */
+function DemoDataNotice() {
   return (
     <p className="mt-4 flex items-start gap-2 rounded-xl bg-surface px-3 py-2.5 text-xs text-muted-foreground">
       <Info size={14} className="mt-0.5 shrink-0 text-info" />
       <span>
-        Demo sign-in. No password is checked and the session lives only in this
-        browser, so role gates here are navigation, not security.
+        Sign-in is real — passwords are hashed and verified on the server, and
+        your role is assigned there. The catalogue and order history are sample
+        data for this build.
       </span>
     </p>
   );
@@ -173,14 +134,21 @@ function DemoAuthNotice() {
 
 type Errs = { name?: string; email?: string; password?: string; confirm?: string };
 
-/** Shared by all three entry points: write the session, then land somewhere useful. */
-function useSignIn(redirect: string) {
-  const { login } = useStore();
+/**
+ * Lands the visitor somewhere useful after the server confirms who they are.
+ *
+ * The destination is chosen from the role the SERVER returned, never from a
+ * control on this page. The role picker that used to sit in this form let the
+ * visitor select `vendor` and have it written straight into the session; the
+ * server now assigns the role and `signup` does not accept one at all.
+ */
+function useLandAfterAuth(redirect: string) {
+  const { refreshUser } = useStore();
   const navigate = useNavigate();
 
-  return (user: { name: string; email: string; role: Role }) => {
-    login(user);
-    const fallback = user.role === "vendor" ? "/vendor" : user.role === "admin" ? "/admin" : "/";
+  return async (user: PublicUser) => {
+    await refreshUser();
+    const fallback = user.role === "vendor" ? "/vendor" : "/";
     const to = redirect || fallback;
     // Let the success state render for a beat before leaving the page.
     setTimeout(() => navigate({ to, replace: true }), 600);
@@ -190,38 +158,47 @@ function useSignIn(redirect: string) {
 function LoginForm({ passwordVisible, onToggleVisible, onPasswordFocus, redirect }: PasswordHandlers & { redirect: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("customer");
   const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<Errs>({});
+  const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const signIn = useSignIn(redirect);
+  const land = useLandAfterAuth(redirect);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (loading || success) return;
+    setFormError("");
     const errs: Errs = {};
     if (!email) errs.email = "Please enter your email.";
     else if (!emailOk(email)) errs.email = "That email doesn't look right.";
     if (!password) errs.password = "Please enter your password.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
+
     setLoading(true);
-    await fakeAuth();
-    setLoading(false);
-    setSuccess(true);
-    signIn({ name: nameForEmail(email), email: email.trim(), role });
+    try {
+      // Client-side checks above are a convenience. The server validates again
+      // and is the only thing that decides whether these credentials are good.
+      const user = await loginFn({ data: { email: email.trim(), password } });
+      setSuccess(true);
+      await land(user);
+    } catch (error) {
+      setFormError(messageFor(error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <form noValidate onSubmit={submit} className="space-y-4">
+      {formError && <FormError message={formError} />}
       <Field id="email" label="Email" error={errors.email}>
         <TextInput id="email" type="email" autoComplete="email" placeholder="you@example.com" icon={<Mail size={18} />} value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} disabled={loading} />
       </Field>
       <Field id="password" label="Password" error={errors.password} aside={<Link to="/login" className="text-xs font-semibold text-brand hover:underline">Forgot password?</Link>}>
         <PasswordInput id="password" value={password} onChange={setPassword} error={errors.password} disabled={loading} visible={passwordVisible} onToggle={onToggleVisible} onFocusChange={onPasswordFocus} placeholder="Your password" autoComplete="current-password" />
       </Field>
-      <RolePicker value={role} onChange={setRole} disabled={loading || success} />
       <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm text-muted-foreground">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded accent-[var(--brand)]" />
         Remember me for 30 days
@@ -235,15 +212,17 @@ function SignupForm({ passwordVisible, onToggleVisible, onPasswordFocus, redirec
   const [v, setV] = useState({ name: "", email: "", password: "", confirm: "" });
   const [accepted, setAccepted] = useState(false);
   const [errors, setErrors] = useState<Errs & { accepted?: string }>({});
+  const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const signIn = useSignIn(redirect);
+  const land = useLandAfterAuth(redirect);
 
   const set = (k: keyof typeof v) => (val: string) => setV((s) => ({ ...s, [k]: val }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (loading || success) return;
+    setFormError("");
     const errs: Errs & { accepted?: string } = {};
     if (!v.name.trim()) errs.name = "Tell us your name.";
     if (!v.email) errs.email = "Please enter your email.";
@@ -256,17 +235,25 @@ function SignupForm({ passwordVisible, onToggleVisible, onPasswordFocus, redirec
     if (!accepted) errs.accepted = "Please accept the terms to continue.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
+
     setLoading(true);
-    await fakeAuth();
-    setLoading(false);
-    setSuccess(true);
-    // New accounts are always shoppers. Selling requires an application at
-    // /vendor-register and a verification step, same as the seeded sellers.
-    signIn({ name: v.name.trim(), email: v.email.trim(), role: "customer" });
+    try {
+      // No role is sent. New accounts are shoppers; the server decides and will
+      // not read a role from this request. Selling requires an application at
+      // /vendor-register and a verification step, same as the seeded sellers.
+      const user = await signupFn({ data: { name: v.name.trim(), email: v.email.trim(), password: v.password } });
+      setSuccess(true);
+      await land(user);
+    } catch (error) {
+      setFormError(messageFor(error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <form noValidate onSubmit={submit} className="space-y-3.5">
+      {formError && <FormError message={formError} />}
       <Field id="name" label="Full name" error={errors.name}>
         <TextInput id="name" autoComplete="name" placeholder="Ada Lovelace" icon={<User size={18} />} value={v.name} onChange={(e) => set("name")(e.target.value)} error={errors.name} disabled={loading} />
       </Field>
@@ -294,44 +281,6 @@ function SignupForm({ passwordVisible, onToggleVisible, onPasswordFocus, redirec
   );
 }
 
-function SocialLogin({ redirect, disabled }: { redirect: string; disabled: boolean }) {
-  const [busy, setBusy] = useState(false);
-  const signIn = useSignIn(redirect);
-
-  // There is no OAuth client behind this. It mints the same local demo session
-  // the email form does, under a Google-shaped identity, and says so.
-  const go = async () => {
-    if (busy || disabled) return;
-    setBusy(true);
-    await fakeAuth();
-    signIn({ name: "Google Guest", email: "guest@gmail.com", role: "customer" });
-  };
-
-  return (
-    <>
-      <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" />
-      </div>
-      <button
-        type="button"
-        onClick={go}
-        disabled={busy || disabled}
-        className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border bg-card font-semibold text-foreground transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {busy ? (
-          <Loader2 size={18} className="animate-spin" />
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
-        )}
-        {busy ? "Signing you in" : "Continue with Google"}
-      </button>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        Simulated for this demo — no Google account is contacted.
-      </p>
-    </>
-  );
-}
-
 export function AuthPanel(props: PasswordHandlers & { mode: AuthMode; onModeChange: (m: AuthMode) => void; redirect?: string }) {
   const { mode, onModeChange, redirect = "", ...pw } = props;
   const login = mode === "login";
@@ -350,9 +299,11 @@ export function AuthPanel(props: PasswordHandlers & { mode: AuthMode; onModeChan
 
           {login ? <LoginForm {...pw} redirect={redirect} /> : <SignupForm {...pw} redirect={redirect} />}
 
-          <SocialLogin redirect={redirect} disabled={false} />
+          {/* "Continue with Google" removed: there is no OAuth client behind it.
+              It minted a local session under a chosen identity, which is a
+              sign-in bypass now that sessions are issued by the server. */}
 
-          <DemoAuthNotice />
+          <DemoDataNotice />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {login ? "Don't have an account? " : "Already have an account? "}
