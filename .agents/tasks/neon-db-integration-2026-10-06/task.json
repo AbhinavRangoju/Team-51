@@ -1,0 +1,7 @@
+{
+  "task_id": "task-neon-db-integration",
+  "task_description": "Add Neon Postgres as the persistence BACKEND for MarketHub while preserving src/lib/server/db.ts's exported interface exactly, so no caller in src/lib/api/ or src/routes/ changes. Driver is @neondatabase/serverless pinned to an exact version, HTTP path only, no ORM, hand-written parameterized SQL. DATABASE_URL is read via serverEnv('DATABASE_URL'); when set the store uses Neon Postgres, when unset the existing JSON file store works exactly as today. Includes idempotent schema migrations, idempotent seeding against Postgres, mocked-executor SQL unit tests, live end-to-end verification against the user's real Neon instance, a .env.example entry, and an ADR plus corrections to the docs that currently claim there is no database.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
