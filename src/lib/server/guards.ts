@@ -13,7 +13,7 @@
  * `requireVendor` below throws instead. There is no fallback path.
  */
 
-import { cartItemKey, db, type CartItemRow, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
+import { cartItemKey, db, type AddressRow, type CartItemRow, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
 import { requireSessionUser, type SessionUser } from "./session";
 import { forbidden, notFound } from "./validate";
 
@@ -77,6 +77,13 @@ export function requireOwnCartItem(userId: string, productId: string): CartItemR
   const item = db().t.cartItems.get(cartItemKey(userId, productId));
   if (!item) throw notFound("Cart item not found.");
   return item;
+}
+
+/** Address IDs are random, but ownership remains mandatory; obscurity is not authorization. */
+export function requireOwnAddress(userId: string, addressId: string): AddressRow {
+  const address = db().t.addresses.get(addressId);
+  if (!address || address.userId !== userId) throw notFound("Address not found.");
+  return address;
 }
 
 /**

@@ -82,6 +82,23 @@ export type CartItemRow = {
   updatedAt: string;
 };
 
+export type AddressRow = {
+  id: string;
+  userId: string;
+  label: string;
+  name: string;
+  phone: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: "IN";
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProductRow = {
   id: string;
   vendorId: string;
@@ -155,6 +172,8 @@ type Tables = {
   products: Map<string, ProductRow>;
   /** userId:productId -> cart line. User ownership is structural, not client supplied. */
   cartItems: Map<string, CartItemRow>;
+  /** Random addressId -> address row. Every lookup also proves row.userId. */
+  addresses: Map<string, AddressRow>;
   orders: Map<string, OrderRow>;
 };
 
@@ -189,6 +208,7 @@ function emptyDb(): Db {
       vendors: new Map(),
       products: new Map(),
       cartItems: new Map(),
+      addresses: new Map(),
       orders: new Map(),
     },
     emailIndex: new Map(),
@@ -203,6 +223,7 @@ type Persisted = {
   vendors: VendorRow[];
   products: ProductRow[];
   cartItems: CartItemRow[];
+  addresses: AddressRow[];
   orders: OrderRow[];
   seeded: boolean;
 };
@@ -218,6 +239,7 @@ function hydrate(db: Db, raw: Persisted): void {
   for (const item of raw.cartItems ?? []) {
     db.t.cartItems.set(cartItemKey(item.userId, item.productId), item);
   }
+  for (const address of raw.addresses ?? []) db.t.addresses.set(address.id, address);
   for (const o of raw.orders ?? []) {
     db.t.orders.set(o.id, o);
     db.idemIndex.set(o.idempotencyKey, o.id);
@@ -257,6 +279,7 @@ function snapshot(d: Db): Persisted {
     vendors: [...d.t.vendors.values()],
     products: [...d.t.products.values()],
     cartItems: [...d.t.cartItems.values()],
+    addresses: [...d.t.addresses.values()],
     orders: [...d.t.orders.values()],
     seeded: d.seeded,
   };

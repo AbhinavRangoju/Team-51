@@ -8,7 +8,7 @@
  * column is invisible to the client until someone adds it here on purpose.
  */
 
-import type { CartItemRow, OrderRow, ProductRow, UserRow, VendorRow } from "./db";
+import type { AddressRow, CartItemRow, OrderRow, ProductRow, UserRow, VendorRow } from "./db";
 
 export type OrderDto = {
   id: string;
@@ -257,6 +257,35 @@ export const toVendorDto = (v: VendorRow): VendorDto => ({
   status: v.status,
   verified: v.verified,
   rating: v.rating,
+});
+
+export type AddressDto = {
+  id: string;
+  label: string;
+  name: string;
+  phone: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: "IN";
+  isDefault: boolean;
+};
+
+/** Owner-facing PII, but never persistence ownership or internal timestamps. */
+export const toAddressDto = (address: AddressRow): AddressDto => ({
+  id: address.id,
+  label: address.label,
+  name: address.name,
+  phone: address.phone,
+  line1: address.line1,
+  line2: address.line2,
+  city: address.city,
+  state: address.state,
+  postalCode: address.postalCode,
+  country: address.country,
+  isDefault: address.isDefault,
 });
 
 export type AccountDto = {
