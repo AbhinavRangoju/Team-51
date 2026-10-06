@@ -148,8 +148,12 @@ export const askHubby = createServerFn({ method: "POST" })
             source: "gemini",
           };
         }
+        // `rejected` deliberately reads the same as `unconfigured` to the
+        // shopper. "Not connected" is all they can act on, and the state of
+        // our credentials is not their business. The operator-facing detail
+        // goes to the server log instead.
         const notice =
-          error.failure === "unconfigured"
+          error.failure === "unconfigured" || error.failure === "rejected"
             ? "Hubby's AI is not connected yet, so this is a basic keyword match."
             : error.failure === "busy"
               ? "Hubby's AI is busy right now, so this is a basic keyword match."

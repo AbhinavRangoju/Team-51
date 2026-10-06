@@ -4507,3 +4507,130 @@ Actions Taken:
 * Re-fetched origin, re-verified `git merge-base --is-ancestor origin/main Frontend`, then pushed `86e55b4f..a50f9a67 Frontend -> main` (fast-forward, 12 commits)
 * Synced local main with `git fetch origin main:main`; confirmed all four refs at a50f9a67
 * Audited origin/main's tree: 154 files, onboarding and backend both present, .env absent, node_modules/.output at 0
+
+================================================================================
+[2026-10-06T12:49:35+05:30] SESSION START
+================================================================================
+Agent: Kiro (Claude Opus 5)
+Repo Root: c:\Users\manik\OneDrive\Desktop\Team-51
+Branch: Frontend
+System Time: 2026-10-06T12:49:35+05:30
+Deadline: 2026-10-06T11:00:00+05:30
+
+NOTE: The 24-hour competition window closed at 2026-10-06T11:00:00+05:30,
+roughly 1h 50m before this session began. This turn is recorded for timeline
+completeness and is post-deadline work. The frozen submission SHA in
+metadata/submission.yaml governs evaluation.
+
+================================================================================
+[2026-10-06T12:52:10+05:30] Fix Hubby falling back to offline keyword matching
+================================================================================
+User Prompt (verbatim):
+Hubby's AI is not connected yet, so this is a basic keyword match.
+
+
+
+Fix this and commit nd push straight to main branch
+
+Agent Response:
+Traced the quoted string to src/lib/hubby/ask.ts:129, which is the branch taken
+when isGeminiConfigured() is false. GEMINI_API_KEY was present in .env with a
+53-character value, so the question was why the server never saw it.
+
+Root cause: .env was saved as UTF-8 WITH a byte order mark. Nitro's vite plugin
+loads .env through c12, which parses with node:util.parseEnv, and parseEnv does
+not strip a BOM. The BOM therefore became part of the first key's name. Proven
+against nitro's own bundled loader using a dummy value in a temp directory:
+
+  GEMINI_API_KEY   -> UNDEFINED
+  SECOND_KEY       -> plain
+  BOM-prefixed key -> DUMMY_VALUE_123
+
+Only the first key in the file is affected, and nothing errors - the variable is
+simply absent, isGeminiConfigured() returns false, and Hubby degrades to the
+offline matcher. That silence is what made it look like the AI was "not
+connected yet".
+
+Fixed in two places. The local .env was rewritten without the BOM (first three
+bytes now 71,69,77 = "GEM"), and the real c12 loader was re-run to confirm
+process.env.GEMINI_API_KEY now populates at 53 characters. Because .env is
+gitignored, the durable fix is in code: a new serverEnv() helper that falls back
+to the BOM-prefixed lookup, so a BOM-saved .env cannot silently blank out
+configuration on a teammate's machine.
+
+Second, separate finding the team must act on: the API key itself is rejected by
+Google. Live probes returned HTTP 401 ACCESS_TOKEN_TYPE_UNSUPPORTED against both
+v1beta generateContent and the newer v1beta interactions endpoint, and
+API_KEY_SERVICE_BLOCKED when sent as a bearer token. The key's shape is correct
+for the current format (AQ. prefix, 53 chars, base64url body, no stray
+characters), and the transport in gemini.ts is correct per Google's current
+documentation, which specifies the x-goog-api-key header. Google's own developer
+forum attributes this reason code to a key that is invalid, truncated, or not
+linked to a project. DEFAULT_MODEL "gemini-3.8-flash" was also checked and is
+current. So the plumbing is now correct and Hubby will connect as soon as a
+working key is issued in Google AI Studio; until then it falls back, and the
+server log now names the cause.
+
+To make that visible, 401/403 is now classified as a distinct "rejected"
+failure. Previously a refused key fell into "upstream" and surfaced as "briefly
+unavailable", which points whoever is debugging at a network fault when the real
+fix is a new key. The shopper-facing notice is intentionally unchanged, since
+credential state is operator detail.
+
+Agent Response Summary:
+Found and fixed the real defect: a UTF-8 BOM on .env made node:util.parseEnv
+name the first key "\uFEFFGEMINI_API_KEY", so process.env.GEMINI_API_KEY was
+undefined and Hubby silently used its offline matcher. Stripped the BOM locally
+and added a BOM-tolerant serverEnv() reader so it cannot recur, since .env is
+gitignored. Also classified Gemini 401/403 as a distinct "rejected" failure that
+is named in the server log, because the API key currently in .env is separately
+rejected by Google (401 ACCESS_TOKEN_TYPE_UNSUPPORTED) and needs replacing by
+the team.
+
+Commit SHA:
+783f5234237ff1b0f97064915b566856c91603dc
+
+Files Modified / Created:
+* src/lib/server/env.ts (Created)
+* src/lib/hubby/gemini.ts (Modified)
+* src/lib/hubby/ask.ts (Modified)
+* .env.example (Modified)
+* .env (Modified - BOM stripped; gitignored, not committed)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Grepped the quoted notice to src/lib/hubby/ask.ts:129 and offline.ts; read
+  ask.ts, gemini.ts, contract.ts, offline.ts, start.ts, vite.config.ts
+* Listed env key names and value lengths without printing the secret; detected
+  HasBOM=True on .env
+* Traced nitro's env loading to createNitro({ dotenv: ... }) in
+  node_modules/nitro/dist/vite.mjs:450-452 and c12's setupDotenv/readEnvFile,
+  confirming _parseEnv = nodeUtil.parseEnv on Node v24.14.1
+* Proved the BOM breaks parsing: util.parseEnv on the real .env yielded a key
+  whose first codepoint is feff and no plain GEMINI_API_KEY
+* Reproduced end to end with a dummy value in a temp dir against nitro's own
+  c12 loader, confirming only the first key is affected
+* Rewrote .env as UTF-8 without BOM via System.Text.UTF8Encoding($false);
+  verified the leading bytes and re-ran c12 setupDotenv (key now set, len 53)
+* Probed the live Gemini API four ways (x-goog-api-key, ?key=, bearer, v1alpha;
+  generateContent and interactions): all 401, reason
+  ACCESS_TOKEN_TYPE_UNSUPPORTED / API_KEY_SERVICE_BLOCKED
+* Validated key shape (AQ. prefix, 53 chars, base64url body, 0 non-ASCII) to
+  rule out a paste error
+* Checked Google's current API key and text-generation docs plus the official
+  developer forum to confirm x-goog-api-key is correct for AQ. auth keys and
+  that gemini-3.8-flash is a current model
+* Added src/lib/server/env.ts; wired gemini.ts to serverEnv; added the
+  "rejected" GeminiFailure with an explicit server-log line; mapped it in ask.ts
+* Documented the BOM trap and the AQ. key format in .env.example
+* Wrote a temporary vitest file covering serverEnv (plain, BOM, trim, absent)
+  and the 401/403 -> rejected, 429 -> busy, 500 -> upstream mapping: 8/8 passed,
+  then deleted the file
+* Ran npm test (26/26), npm run build (exit 0), npm run typecheck (11 errors,
+  all the documented pre-existing chart.tsx/calendar.tsx ones, 0 in app code)
+* Diagnosed 2 transient test failures as a pre-existing hermeticity problem, not
+  a regression: the two checkout tests use fixed idempotency keys against the
+  persisted data/markethub.json, so they only pass once per store. Confirmed
+  26/26 against an isolated MH_DATA_FILE, then backed up the local store to
+  data/markethub.json.bak-20261006-124858 and let seedIfEmpty() rebuild it
+* Committed 783f5234 (4 files, +72/-4); .env confirmed absent from the commit
