@@ -1617,3 +1617,272 @@ Actions Taken:
 * Confirmed SECURITY_ARCHITECTURE.md present in merged tree, 0 Frontend commits touch it
 * git diff --stat / --name-status origin/main...Frontend -> 121 files, 1 deletion (src/.gitkeep)
 * (push recorded below)
+
+================================================================================
+[2026-10-06T07:49:35+05:30] SESSION START
+================================================================================
+Agent: Kiro (Claude Opus 5)
+Repo Root: c:\Users\Vivek\OneDrive\Desktop\Team-51
+Branch: backend
+System Time: 2026-10-06T07:49:35+05:30
+Deadline: 2026-10-06T11:00:00+05:30
+Time Remaining: ~3h 10m
+Note: New machine / new repo root for this project. Prior AGREEMENT RECORDED in
+this log is bound to c:\Users\manik\OneDrive\Desktop\Team-51, a different repo
+root, so the AGENTS.md §3 onboarding gate is CLOSED for this participant and was
+re-presented this turn. Read-only analysis was performed; no implementation.
+
+================================================================================
+[2026-10-06T07:53:04+05:30] Backend analysis request (Member 1) + onboarding gate
+================================================================================
+User Prompt (verbatim):
+You are working with me as Member 1 — Backend Engineer for our MarketHub project.
+
+MarketHub is a secure multi-vendor e-commerce marketplace for a 24-hour cybersecurity hackathon.
+
+My responsibility is the backend:
+
+- Backend architecture and APIs
+
+- Database/data models
+
+- Authentication and sessions
+
+- Authorization implementation
+
+- Products and vendor operations
+
+- Cart
+
+- Checkout
+
+- Orders and order tracking
+
+- Admin backend APIs
+
+- Server-side validation and business logic
+
+The frontend has already been completed and pushed to the repository. I have pulled the latest code locally.
+
+Before writing code:
+
+1. Inspect the existing repository thoroughly.
+
+2. Understand the frontend's API/server requirements, data models, request/response expectations, and existing server code.
+
+3. Identify what backend functionality already exists and what is missing.
+
+4. Do not rewrite or unnecessarily modify the completed frontend.
+
+5. Do not invent APIs that the frontend does not need.
+
+Follow these security principles:
+
+- The server is the final authority.
+
+- Never trust client-provided roles, prices, totals, stock, ownership, or order state.
+
+- Authorization must be enforced server-side.
+
+- Vendors must only access their own products and orders.
+
+- Validate all incoming data.
+
+- Prevent IDOR, injection, XSS, CSRF and privilege escalation.
+
+- Checkout must calculate prices and totals on the server.
+
+- Handle stock and duplicate checkout safely.
+
+- Do not expose stack traces, secrets, or sensitive data.
+
+- Prefer simple, reliable implementation suitable for a 24-hour hackathon.
+
+Work incrementally. Do not build everything at once.
+
+First, ONLY analyze the current repository and give me:
+
+1. Current backend/server structure
+
+2. Frontend-to-backend requirements you found
+
+3. Existing backend functionality
+
+4. Missing backend functionality
+
+5. Recommended database/data model
+
+6. Recommended implementation order
+
+7. Any conflicts or problems you found
+
+Do not modify files yet. Wait for my approval before starting implementation.
+
+Agent Response:
+Performed a read-only inspection of the whole repository. No source file was
+modified. docs/logs.txt was appended to, because AGENTS.md §2 and §7 make turn
+logging unconditional and not overridable by a prompt instruction; the "do not
+modify files" instruction was honoured for every other path.
+
+HARD CONSTRAINT SURFACED FIRST: system time is 2026-10-06T07:53+05:30 and the
+code freeze is 2026-10-06T11:00:00+05:30. Roughly 3 hours remain, not 24. The
+ten-area backend scope in the prompt is not achievable at defensible quality in
+that window. Recommended a prioritised subset (auth/session, server-authoritative
+checkout, vendor ownership scoping) and advised deferring the rest.
+
+1. CURRENT BACKEND/SERVER STRUCTURE
+TanStack Start 1.168 on React 19 / Vite 8 / Nitro 3 — a full-stack framework, so
+the "backend" is server functions plus the Nitro server entry, not a separate
+service. Relevant files:
+* src/server.ts — Nitro fetch entry. Wraps SSR, normalises h3-swallowed 500s and
+  returns a generic HTML error page. Good: no stack traces leak to the client.
+* src/start.ts — createStart() with two request middlewares: errorMiddleware
+  (generic 500, logs server-side only) and createCsrfMiddleware filtered to
+  ctx.handlerType === "serverFn". CSRF is therefore ALREADY handled for every
+  server function.
+* src/lib/hubby/ask.ts — the ONLY existing server function (askHubby, POST).
+* src/lib/hubby/gemini.ts — reads process.env.GEMINI_API_KEY inside the handler
+  and is pulled in by dynamic import, keeping the key out of the client bundle.
+* No database. No ORM, no driver, no migration tool in package.json. No
+  bcrypt/argon2, no jose/jsonwebtoken. No session store. No .env.example.
+
+2. FRONTEND-TO-BACKEND REQUIREMENTS FOUND
+All application state is client-side. src/lib/store.tsx is a React context
+persisted whole to localStorage under key "markethub-state-v1", holding user,
+addresses, cart, wishlist, orders, readNotices. src/lib/data.ts is a static seed
+module (8 categories, 8 vendors, 12 products, 3 customer orders, 6 vendor orders,
+6 customers, 6-month sales series) imported directly by 15+ components.
+Concrete server surfaces the UI already implies:
+* Auth — AuthPanel.tsx has login, signup and a simulated Google button. fakeAuth()
+  is a 1300 ms setTimeout. No password is ever checked. Requires signup, login,
+  logout, session read.
+* Role — RolePicker lets the visitor PICK their own role at sign-in. Requires
+  server-assigned roles.
+* Catalogue — shop/categories/deals/product.$id/vendors read the seed array
+  directly. Requires product list + single product + vendor list/store reads.
+* Cart — useCartTotals() in routes/cart.tsx computes mrp, subtotal, discount,
+  delivery (free >= 999 else 79), tax (round 5%), total entirely in the browser.
+* Checkout — routes/checkout.tsx builds the Order object client-side, invents the
+  order id as "MH-" + random, sets payment status itself, and calls addOrder().
+* Orders — routes/orders.tsx cancels via updateOrder(id, {status:"Cancelled",
+  payment:"Refunded"}) with no server check. orderFlow in data.ts defines the
+  7-state lifecycle.
+* Vendor ops — routes/vendor.tsx resolves "my store" by matching session email
+  against the seed vendors and FALLS BACK to the first verified vendor if no
+  match. Order status advance is local useState over the shared vendorOrders
+  seed. "Add product" shows a toast that says a catalogue API is required.
+* Vendor onboarding — routes/vendor-register.tsx 4-step form, submit is a
+  setTimeout that mints a fake reference MH-APP-xxxxx. Nothing persists.
+* Notifications — src/lib/notifications.ts derives notices purely from (orders,
+  wishlist). Needs no endpoint of its own if orders come from the server.
+
+3. EXISTING BACKEND FUNCTIONALITY
+Only askHubby. It is, notably, already written to the standard the prompt asks
+for: POST so CSRF applies, an explicit validateAsk validator, control-character
+stripping, length caps, an in-process fixed-window per-IP rate limiter, secrets
+read server-side only, and every product id returned by Gemini re-resolved
+against the real catalogue before reaching the client. It is the correct
+reference pattern for everything else. Plus the generic error handling in
+server.ts / start.ts and the CSRF middleware in start.ts.
+
+4. MISSING BACKEND FUNCTIONALITY
+Everything else. Persistence layer, password hashing, session issuance and
+verification, server-side role assignment, server-side authorization, catalogue
+reads, cart persistence, server-computed checkout, order creation with stock
+decrement and idempotency, order tracking, vendor-scoped product and order APIs,
+vendor application persistence, admin APIs. Also: no /admin route exists at all
+(AuthPanel's "/admin" is a dead string in a fallback branch and the role picker
+deliberately omits admin), so admin backend APIs have no consumer.
+
+5. RECOMMENDED DATA MODEL
+SQLite via node:sqlite (built into Node 24.14.1, already installed; zero new
+dependencies, no native build step). WAL mode, synchronous better-sqlite3-style
+API, one file at data/markethub.db. Tables: users(id, email UNIQUE COLLATE
+NOCASE, name, phone, password_hash, password_salt, role CHECK IN
+('customer','vendor','admin'), status, created_at); sessions(id, user_id, csrf,
+expires_at, created_at); vendors(id, user_id, name, slug, tagline, city, since,
+status CHECK, verified, rating, created_at); products(id, vendor_id, name,
+category, brand, price_paise INTEGER, original_price_paise, stock, rating,
+reviews, sku, image_key, status, description, specs_json, created_at);
+addresses(id, user_id, label, name, phone, line, city, pin, is_default);
+cart_items(user_id, product_id, qty, saved, PRIMARY KEY(user_id, product_id));
+orders(id, user_id, subtotal_paise, discount_paise, delivery_paise, tax_paise,
+total_paise, status, payment, method, eta, ship_name, ship_phone, ship_line,
+ship_city, ship_pin, idempotency_key UNIQUE, created_at);
+order_items(order_id, product_id, vendor_id, qty, unit_price_paise,
+name_snapshot). Money in integer paise throughout to kill float drift. Prices,
+totals, roles, stock and order state are read only from this database, never from
+the request body.
+
+6. RECOMMENDED IMPLEMENTATION ORDER
+Given ~3h, ranked by security value per minute:
+P0 (must) — DB + schema + seed importer; real auth (scrypt via node:crypto,
+httpOnly+SameSite=Strict+Secure session cookie, server-assigned role, signup
+forced to customer); requireUser/requireRole/requireVendorOwner guards;
+server-authoritative checkout (recompute every line price and total from the DB,
+single transaction, stock decrement with a CHECK, idempotency key to defeat
+double-submit).
+P1 (should) — server-backed orders list and detail scoped by user_id; cancel with
+a server-side state-machine check; vendor products and vendor orders scoped by
+ownership.
+P2 (if time) — vendor product create/update, vendor order status advance,
+address CRUD, cart persistence.
+P3 (drop) — admin APIs (no UI consumer), vendor application persistence,
+payouts, analytics.
+
+7. CONFLICTS AND PROBLEMS FOUND
+C1 Timeline. ~3h for a 10-area backend. Scope must be cut.
+C2 Client-selected role. AuthPanel's RolePicker is a direct privilege-escalation
+   path and contradicts "never trust client-provided roles". The control must
+   change behaviour, not just be re-pointed at an API.
+C3 Client-side money. useCartTotals and checkout.tsx compute and submit totals.
+   checkout.tsx also sets payment:"Paid" itself.
+C4 Client-minted order ids. "MH-" + Math.random() collides and is guessable.
+C5 Vendor identity fallback. useMyVendor() defaults to the first verified vendor
+   when no match — on a server-backed build that is cross-tenant data exposure.
+C6 Shared mutable seed. vendorOrders/seedOrders are module-level arrays treated
+   as per-user data.
+C7 No /admin route. Admin APIs would have no consumer.
+C8 Float money. price * qty * 0.05 in JS floats.
+C9 npm run typecheck is already failing on src/components/ui/chart.tsx and
+   calendar.tsx (stale shadcn wrappers vs installed recharts / react-day-picker
+   majors). Pre-existing, unimported by any route, but it means typecheck cannot
+   be used as a clean backend regression gate without excluding those two files.
+C10 Images are Vite asset imports (@/assets/*.jpg). A DB-backed product cannot
+   carry a bundler URL, so an image_key -> static map must stay client-side.
+C11 metadata/submission.yaml commit_sha and deployment_url are still empty with
+   ~3h to the freeze.
+
+Agent Response Summary:
+Completed a read-only audit of the repository and delivered the seven requested
+sections. Principal finding: the app is a TanStack Start full-stack project whose
+only existing server code is the askHubby server function plus CSRF and generic
+error middleware; all marketplace state is client-side localStorage over a static
+seed module, so every backend concern in the prompt is unimplemented. Second
+principal finding: only ~3 hours remain before the code freeze, so the full
+ten-area scope was explicitly flagged as unachievable and a P0/P1/P2/P3 cut was
+proposed. Eleven concrete conflicts were recorded, the sharpest being the
+client-side role picker, client-computed order totals and the vendor-identity
+fallback that would become cross-tenant exposure once data is real. No
+implementation started; awaiting participant approval and the §3 agreement.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read AGENTS.md, docs/logs.txt, docs/APPROACH.md, metadata/team.yaml, metadata/submission.yaml
+* Captured system time / timezone; ran git rev-parse, git log, git remote -v, git status
+* Enumerated all 113 files under src/ with sizes
+* Read src/server.ts, src/start.ts, vite.config.ts, package.json
+* Read src/lib/store.tsx, src/lib/data.ts, src/lib/notifications.ts, src/lib/hubby/ask.ts
+* Read src/components/mh/RequireAuth.tsx, src/components/auth/AuthPanel.tsx
+* Read src/routes/login.tsx, src/routes/cart.tsx, src/routes/checkout.tsx
+* Read src/routes/vendor.tsx (lines 1-135, 200-380) incl. useMyVendor, Orders, Listings, Payouts
+* Grepped for createServerFn / fetch / process.env / useQuery across src — only hubby matched
+* Grepped for "@/lib/data" and useStore() imports to map every page's data dependency
+* Grepped DashShell.tsx role gate and searched for any /admin route — none exists
+* Re-presented the AGENTS.md §3 onboarding gate: this repo root has no AGREEMENT RECORDED line
+* Modified no file other than docs/logs.txt
