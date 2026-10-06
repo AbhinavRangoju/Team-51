@@ -5033,3 +5033,216 @@ Files Modified / Created:
 
 Actions Taken:
 * git fetch; git merge origin/main; git push origin main (success)
+
+================================================================================
+[2026-10-06T15:10:00+05:30] Fix Hubby AI conversational chatbot behavior & model reliability
+================================================================================
+User Prompt (verbatim):
+The assisant ai hubby isnt working like a chat bot, Look into it
+
+Agent Response:
+Investigated why Hubby was not functioning like a conversational chatbot. Identified two root causes:
+1. Model 503 Overload: gemini-3.8-flash was hardcoded as DEFAULT_MODEL in src/lib/hubby/gemini.ts. Google AI Studio returns HTTP 503 Service Unavailable on that model due to high demand. Because there was no model fallback, every request failed and dropped immediately into the offline matcher.
+2. Offline matcher had no conversational intelligence: In src/lib/hubby/offline.ts, whenever a user greeted ("hi", "hello") or asked general questions ("who are you", "what can you do", "delivery options", "thank you"), zero product tokens matched, causing it to arbitrarily dump 3 random product cards with "Here are 3 picks from verified MarketHub sellers" and a warning that Hubby was busy. It was acting as an unintended product dumper rather than a chat bot.
+
+Implemented solutions across the stack:
+- Multi-model resilient fallback in gemini.ts: Switched DEFAULT_MODEL to gemini-3.5-flash (which responds live in ~1.5s with HTTP 200). Added automatic candidate model failover across [gemini-3.5-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.8-flash] on 503/429 spikes.
+- Conversational chat bot prompt guidelines in prompt.ts: Explicitly instructed Hubby to converse naturally, greet shoppers warmly, explain capabilities and policies (delivery, returns, payments) conversationally, and strictly set productIds: [] when not recommending specific products.
+- Intelligent offline conversational intents in offline.ts: Added recognition for greetings, bot identity/help, shipping/delivery policies, returns/refunds, payments/COD, and gratitude, with productIds: [] and helpful suggestion chips. For queries with zero matching catalogue items, provides polite search guidance instead of dumping products.
+- Chatbot UI polish in AIAssistant.tsx: Added a New Chat / reset conversation button, distinct mini bot avatar next to Hubby messages, whitespace-pre-wrap for multiline formatting, and persistent suggestion chips.
+- Robust environment loading in serverEnv: Added fallback disk read for .env so API keys are guaranteed in all runtime contexts.
+- Added test suite in src/test/hubby.test.ts verifying both offline chatbot intents and live Gemini integration (all 9 tests passing).
+
+Agent Response Summary:
+Diagnosed why Hubby failed to act as a chatbot: hardcoded gemini-3.8-flash returned HTTP 503, causing silent fallback to an offline engine that dumped random products for greetings and casual questions. Added automatic multi-model failover, conversational intent handling in the offline engine, strict chatbot system prompt guidelines, chat reset controls, and bot avatars in the UI. Verified all 9 unit tests pass and production build succeeds.
+
+Commit SHA:
+7c0fc9a2
+
+Files Modified / Created:
+* src/lib/server/env.ts (Modified)
+* src/lib/hubby/gemini.ts (Modified)
+* src/lib/hubby/prompt.ts (Modified)
+* src/lib/hubby/offline.ts (Modified)
+* src/components/mh/AIAssistant.tsx (Modified)
+* src/test/hubby.test.ts (Created)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Probed Gemini API model availability and confirmed 503 on gemini-3.8-flash vs 200 on gemini-3.5-flash
+* Added candidate model failover in src/lib/hubby/gemini.ts
+* Added conversational chatbot guidelines in src/lib/hubby/prompt.ts
+* Added conversational intents and no-dump fallback in src/lib/hubby/offline.ts
+* Added reset button, bot avatars, and whitespace-pre-wrap in src/components/mh/AIAssistant.tsx
+* Added fallback disk read in src/lib/server/env.ts
+* Created src/test/hubby.test.ts with 9 passing unit tests
+* Verified production build exit 0
+
+
+================================================================================
+[2026-10-06T15:02:36+05:30] SESSION START
+================================================================================
+Agent: Kiro (Claude Opus 5)
+Repo Root: c:\Users\a4ran\OneDrive\Desktop\Team-51
+Branch: main
+System Time: 2026-10-06T15:02:36+05:30
+Deadline: 2026-10-06T11:00:00+05:30
+Time Remaining: NEGATIVE — the deadline passed 4h 02m ago per the local system
+clock. metadata/submission.yaml still has commit_sha: "" (EMPTY). Surfaced to the
+participant this turn. No timestamp was altered or back-dated.
+
+Context sync performed before acting (AGENTS.md section 4.1):
+* Read AGENTS.md in full.
+* `AGREEMENT RECORDED:` lines present in docs/logs.txt: 7, including
+  c:\Users\a4ran\OneDrive\Desktop\Team-51 having been accepted under the
+  2026-10-05T13:04:10+05:30 agreement by prior sessions on this same repo root
+  (see log lines 3348-3352 and 3883-3886, origin
+  https://github.com/AbhinavRangoju/Team-51.git). Section 4 normal-session flow
+  applies; no onboarding gate.
+* metadata/team.yaml verified populated and VALID: team_id 51, name "Trishul",
+  repository set, exactly 4 members. Team size 4 is permitted.
+* Read the log head and true tail (4926+ lines). Last recorded turn was
+  2026-10-06T14:30:46+05:30 (Neon push). HEAD commit 2fe16f53 "Hubby" appears
+  NOT to have a turn entry — flagged, not fabricated.
+* `git status --short`: 5 modified files (src/components/mh/AIAssistant.tsx,
+  src/lib/hubby/{gemini,offline,prompt}.ts, src/lib/server/env.ts) and 1
+  untracked (src/test/hubby.test.ts) — an uncommitted, never-security-reviewed
+  LLM assistant feature.
+* .env verified gitignored and untracked. Key NAMES only: DATABASE_URL,
+  GEMINI_API_KEY. No value read, printed or logged.
+
+================================================================================
+[2026-10-06T15:02:36+05:30] Full security hardening pass — audit/implement/review
+================================================================================
+User Prompt (verbatim):
+Make the website secure bro and let us know what you did for security
+
+Agent Response:
+Synced context, then dispatched a multi-stage security hardening workflow
+(wf_c07377f783c35b11, label security-hardening-markethub) rather than making
+ad-hoc edits, because "make the website secure" spans the whole application:
+frontend, server functions, auth, checkout integrity, the new Postgres data
+layer, and a brand-new LLM feature. Shape: audit (wf-planner) -> implement/review
+loop (wf-coder + semantic_reviewer, max 5 iterations, gated on an APPROVED
+verdict) -> documentation step.
+
+Explicitly told the run to work IN PLACE on branch main with NO git worktree,
+because the working tree holds uncommitted Hubby changes that are themselves in
+scope and a worktree would have left them behind.
+
+Priority scope handed to the run, highest risk first:
+* P0 — the uncommitted, unreviewed "Hubby" Gemini assistant
+  (src/lib/hubby/{ask,catalog,contract,gemini,offline,prompt}.ts,
+  src/components/mh/AIAssistant.tsx, src/lib/server/env.ts). GEMINI_API_KEY must
+  never reach the client bundle; prompt injection from both user messages and
+  catalogue text; model output treated as untrusted and allow-listed against the
+  server action contract; rate limit / input length / token / timeout caps
+  (the free tier is ~20 req/day/model, so an open endpoint is a trivial
+  denial-of-wallet target); no PII or session data in prompts; safe rendering
+  with no dangerouslySetInnerHTML; fail-closed offline fallback.
+* P1 — the two FAILING tests in src/test/backend.test.ts "checkout: stock and
+  idempotency" (stock did not move: expected 107 got 110, expected 108 got 110).
+  Classified as a security defect, not test noise: broken stock decrement means
+  oversell and broken idempotency means double-charge. Root-cause required, with
+  an explicit instruction to check whether the recent JSON -> Postgres store swap
+  broke transactional semantics in tx()/persist(), and whether the decrement is
+  atomic under concurrent checkouts rather than a read-modify-write race.
+* P2 — SQL layer: every query parameterized in src/lib/server/store-postgres.ts
+  and scripts/*.mjs, including ORDER BY / LIMIT / identifiers; sslmode=require
+  enforced; no connection string or query text in client responses.
+* P3 — session/auth/authz: cookie flags (HttpOnly, Secure, SameSite, __Host-
+  prefix), session rotation on login and privilege change, server-side
+  invalidation, idle + absolute timeout, CSRF/origin defence beyond SameSite
+  alone for the POST-over-RPC server functions, password hashing cost and
+  timing-safe comparison, verified fakeVerify reachability on unknown users,
+  IDOR and role checks on orders/account/vendor/admin, mass-assignment
+  prevention, rate limiting and backoff on login/registration/checkout.
+* P4 — response headers in src/server.ts / src/start.ts: a CSP that actually
+  fits the app (no unsafe-eval), X-Content-Type-Options, Referrer-Policy,
+  frame-ancestors, Permissions-Policy, HSTS gated to production — verified by
+  loading pages, not by reading code.
+* P5 — information disclosure: src/lib/{error-capture,error-page,
+  lovable-error-reporting}.ts. No stack traces, SQL or paths in production
+  errors. Specifically asked whether lovable-error-reporting.ts exfiltrates
+  anything to a third-party endpoint, with instructions to flag it loudly and
+  default it off if so. Re-check every public route and DTO for leaked emails,
+  password hashes, internal ids or other users' data, and PRESERVE the existing
+  deliberate decision to withhold seller emails from the public /vendors page.
+
+Hard constraints given: no visual/theme/layout/copy changes of any kind;
+AGENTS.md immutable; docs/logs.txt off-limits to the run (orchestrator owns it);
+metadata/submission.yaml untouched; never print, log or commit a secret value;
+no push, no reset, no force, no history rewrite, no branch deletion; no new
+dependencies unless genuinely required and then pinned exactly; keep the app
+working; and the 11 pre-existing typecheck errors (chart.tsx 10 +
+calendar.tsx 1) are the accepted baseline, neither to be fixed nor exceeded.
+
+Verification gate demanded as executed evidence rather than assertion:
+npm run typecheck at/below baseline, npm test fully green INCLUDING the two P1
+tests, npm run build exit 0, npm run test:e2e, node scripts/cookie-check.mjs,
+db:inspect and test:db when DATABASE_URL is set, a secret-leak grep of
+.output/public/**/*.js for GEMINI / AIza / postgresql:// / neon.tech /
+DATABASE_URL / sslmode with zero hits, a live HTTP sweep of 12 routes dumping
+the actual security headers with the server started as a BACKGROUND process,
+and four negative tests — IDOR on another user's order, unauthenticated access
+to a protected server function, a prompt-injection attempt, and a replayed
+checkout — each of which must be refused and each committed into src/test/ so
+it stays enforced.
+
+Deliverables demanded: the hardening itself; docs/SECURITY_REVIEW.md with
+severity, exact file:line, attacker impact, fix applied, issues found-but-NOT-
+fixed with residual risk, real command output as evidence, and an OWASP Top 10
+2021 coverage table, explicitly with no "fully secure" claims; new ADRs
+continuing the existing 001-009 numbering without collision plus a journal
+entry continuing 1-16 and a refreshed section 6.3 gap list; local commits only
+with every SHA and file list reported back for this log.
+
+Separately flagged to the participant, unprompted, because it affects
+submission validity rather than code: the local system clock reads
+2026-10-06T15:02:36+05:30, which is 4h 02m PAST the
+2026-10-06T11:00:00+05:30 code freeze, and metadata/submission.yaml still
+carries an empty commit_sha. Did not edit that file and did not back-date
+anything — the decision and the explanation belong to the team.
+
+Agent Response Summary:
+Ran the section 4 context sync, confirmed the agreement and a valid 4-member
+team.yaml, and dispatched workflow wf_c07377f783c35b11 to audit and harden the
+whole application in place on main with a reviewer-gated implement loop. Scoped
+the run around the two genuinely unreviewed surfaces — the uncommitted Gemini
+"Hubby" assistant and the Postgres store swap — and reclassified the two failing
+checkout stock/idempotency tests as an oversell and double-charge defect that
+must be root-caused rather than a flaky test. Required executed proof for every
+claim, including a client-bundle secret-leak scan and four negative security
+tests. Flagged that the submission deadline has already passed and that
+metadata/submission.yaml has no frozen commit SHA, without altering either.
+
+Commit SHA:
+(this log entry committed alone as the turn's only orchestrator-owned change;
+SHA recorded in the COMMIT RECORD block appended below. Source changes from
+wf_c07377f783c35b11 are committed by the run itself and their SHAs will be
+appended when it reports back.)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+(No source file was touched by the orchestrator this turn. All src/ and docs/
+changes this turn originate from workflow wf_c07377f783c35b11.)
+
+Actions Taken:
+* Read AGENTS.md; read docs/logs.txt head (549 lines), middle and true tail
+* Read metadata/team.yaml and metadata/submission.yaml
+* Grepped docs/logs.txt for "AGREEMENT RECORDED" (7 hits) and for this repo root
+* `git rev-parse --show-toplevel`, `git branch --show-current`, `git remote -v`,
+  `git log --oneline -8`, `git status --short`
+* `git ls-files | Select-String "\.env"` — only .env.example is tracked; .env is NOT
+* Captured system time, timezone (UTC+05:30) and computed time-to-deadline (-4h 02m)
+* Listed src/, src/lib/, src/lib/{server,api,hubby}/, src/routes/, src/components/mh/,
+  src/test/, scripts/, docs/ to map exact file paths for the workflow brief
+* Read package.json scripts only (dev/build/start/test/test:db/typecheck/db:migrate/
+  db:inspect/serverfn:ids/test:e2e)
+* Read .env KEY NAMES ONLY (DATABASE_URL, GEMINI_API_KEY) — no value read or printed
+* Deliberately did NOT read application source: the audit is the workflow's job
+* `run_workflow` -> wf_c07377f783c35b11 (security-hardening-markethub), status running
+* Committed docs/logs.txt by explicit path only, so the workflow's in-flight
+  source edits were not swept into a half-finished commit
+* No push, no reset, no force, no history rewrite; AGENTS.md and
+  metadata/submission.yaml untouched

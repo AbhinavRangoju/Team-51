@@ -93,7 +93,77 @@ function relevance(p: Product, tokens: string[]): number {
 }
 
 export function answerOffline(question: string, notice?: string): HubbyAnswer {
-  const s = question.toLowerCase();
+  const s = question.toLowerCase().trim();
+
+  // 1. Conversational Greeting
+  if (/^(hi|hello|hey|hiya|howdy|good\s*(morning|afternoon|evening|day)|namaste|sup|yo)\b/i.test(s)) {
+    return {
+      reply: "Hello! I'm Hubby, your MarketHub shopping assistant. I know our entire catalogue of verified products, current deals, and store policies. What can I help you find today?",
+      productIds: [],
+      followUps: ["Running shoes under ₹3000", "Top rated headphones", "Festive Week deals"],
+      source: "offline",
+      notice,
+    };
+  }
+
+  // 2. Identity / Bot Capabilities / Help
+  if (
+    /^(who are you|what can you do|what are you|help\b|how do you work|introduce yourself|tell me about yourself)/i.test(s) ||
+    s === "help"
+  ) {
+    return {
+      reply: "I'm Hubby, MarketHub's AI shopping assistant! I can help you search our live catalogue, compare prices and ratings, check product stock, find discounts, and answer questions about shipping and returns. What would you like to explore?",
+      productIds: [],
+      followUps: ["Show me deals", "Laptops for students", "How does delivery work?"],
+      source: "offline",
+      notice,
+    };
+  }
+
+  // 3. Delivery / Shipping policies
+  if (/\b(delivery|shipping|ship|courier|dispatch|free delivery|charges|express delivery)\b/i.test(s)) {
+    return {
+      reply: "MarketHub delivers across India! Delivery is free on orders ₹999 or more (₹79 for orders under ₹999). Standard delivery takes 3–5 business days, and Express delivery is available for ₹149 (1–2 business days).",
+      productIds: [],
+      followUps: ["What payment methods are supported?", "What is the return policy?", "Show deals"],
+      source: "offline",
+      notice,
+    };
+  }
+
+  // 4. Returns / Refunds policy
+  if (/\b(return|returns|refund|refunds|exchange|cancellation|cancel order)\b/i.test(s)) {
+    return {
+      reply: "MarketHub provides a 7-day hassle-free return policy on eligible products from verified sellers. If an item arrives damaged or differs from the description, you can request a return directly from your Orders page.",
+      productIds: [],
+      followUps: ["How does delivery work?", "What payment methods are supported?", "Show deals"],
+      source: "offline",
+      notice,
+    };
+  }
+
+  // 5. Payment / UPI / COD methods
+  if (/\b(payment|pay|cod|cash on delivery|upi|card|cards|net banking|wallet)\b/i.test(s)) {
+    return {
+      reply: "We support multiple secure payment options: UPI (Google Pay, PhonePe, Paytm), Credit and Debit cards, Net Banking, and Cash on Delivery (COD) for eligible pincodes.",
+      productIds: [],
+      followUps: ["What is the delivery fee?", "Show top rated products", "What deals are live?"],
+      source: "offline",
+      notice,
+    };
+  }
+
+  // 6. Gratitude / Farewell
+  if (/^(thank(s|\s+you)|thx|great|awesome|cool|bye|goodbye|see you|take care)/i.test(s)) {
+    return {
+      reply: "You're very welcome! Feel free to ask anytime you need recommendations or shopping advice on MarketHub. Happy shopping!",
+      productIds: [],
+      followUps: ["Show festive deals", "Best rated products"],
+      source: "offline",
+      notice,
+    };
+  }
+
   const intent = readIntent(s);
   const tokens = s
     .replace(/[^\w\s₹]/g, " ")
@@ -109,6 +179,19 @@ export function answerOffline(question: string, notice?: string): HubbyAnswer {
     .sort((a, b) => b.score - a.score);
 
   const anyMatch = scored.some((x) => x.score > 0);
+  const isGeneralSearch = intent.cheap || intent.discounted || intent.topRated || intent.newest || intent.budget < Infinity;
+
+  // Only return product picks if there was an actual match or a specific product-oriented filter
+  if (!anyMatch && !isGeneralSearch) {
+    return {
+      reply: "I couldn't find any products matching that in our catalogue. I can help you search for electronics, fashion, home decor, beauty, books, or sports gear. What would you like to explore?",
+      productIds: [],
+      followUps: ["What's discounted right now?", "Running shoes under ₹3000", "Best rated headphones"],
+      source: "offline",
+      notice,
+    };
+  }
+
   let picks = (anyMatch ? scored.filter((x) => x.score > 0) : scored).map((x) => x.p);
 
   if (intent.cheap) picks = [...picks].sort((a, b) => a.price - b.price);
@@ -149,3 +232,4 @@ export function answerOffline(question: string, notice?: string): HubbyAnswer {
     notice,
   };
 }
+

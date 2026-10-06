@@ -22,7 +22,14 @@ import {
 } from "./prompt";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-3.8-flash";
+const DEFAULT_MODEL = "gemini-3.5-flash";
+const FALLBACK_MODELS = [
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3-flash-preview",
+  "gemini-3.8-flash",
+];
 const TIMEOUT_MS = 20_000;
 
 /** Why a Gemini call could not be completed. Shapes the UI's fallback notice. */
@@ -86,7 +93,14 @@ export async function askGemini(message: string, history: HubbyTurn[]): Promise<
   const key = serverEnv("GEMINI_API_KEY");
   if (!key) throw new GeminiError("unconfigured", "GEMINI_API_KEY is not set");
 
-  const model = serverEnv("GEMINI_MODEL") || DEFAULT_MODEL;
+  const configuredModel = serverEnv("GEMINI_MODEL");
+  const candidateModels = Array.from(
+    new Set([
+      ...(configuredModel ? [configuredModel] : []),
+      DEFAULT_MODEL,
+      ...FALLBACK_MODELS,
+    ]),
+  );
 
   // The catalogue rides in the system instruction, not in `contents`. That is
   // the trust boundary: system instruction is content we authored, `contents`
@@ -113,51 +127,56 @@ export async function askGemini(message: string, history: HubbyTurn[]): Promise<
     ],
   };
 
-  const url = `${API_ROOT}/${encodeURIComponent(model)}:generateContent`;
   const requestBody = JSON.stringify(body);
 
-  // 429 (quota) and 503 (model overloaded) are both routine and usually clear
-  // within a second or two, so one retry is worth it before falling back to the
-  // offline matcher. Anything else fails immediately — retrying a 400 or a 403
-  // just burns quota.
   let res: Response | undefined;
   let lastStatus = 0;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
+  for (const model of candidateModels) {
+    const url = `${API_ROOT}/${encodeURIComponent(model)}:generateContent`;
 
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: requestBody,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch (error) {
-      const timedOut =
-        error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-      // Log the cause server-side; the client only ever learns the category.
-      console.error("[hubby] Gemini request failed", error);
-      throw new GeminiError(timedOut ? "timeout" : "upstream", "Gemini request did not complete");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+
+      try {
+        res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": key },
+          body: requestBody,
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+      } catch (error) {
+        const timedOut =
+          error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+        console.error(`[hubby] Gemini request to ${model} failed`, error);
+        // Continue to try next model or throw on last
+        if (model === candidateModels[candidateModels.length - 1] && attempt === 1) {
+          throw new GeminiError(timedOut ? "timeout" : "upstream", "Gemini request did not complete");
+        }
+        continue;
+      }
+
+      if (res.ok) break;
+
+      lastStatus = res.status;
+      console.warn(
+        `[hubby] Gemini ${model} HTTP ${res.status} (attempt ${attempt + 1})`,
+        await res.text().catch(() => "<unreadable>"),
+      );
+
+      // Stop immediately if key was rejected; don't burn other models
+      if (res.status === 401 || res.status === 403) break;
+
+      // Only retry same model on 503 or 429; otherwise move to next candidate model
+      if (res.status !== 429 && res.status !== 503) break;
     }
 
-    if (res.ok) break;
-
-    lastStatus = res.status;
-    // Response bodies from Google can echo request detail. Log, never forward.
-    console.error(
-      `[hubby] Gemini HTTP ${res.status} (attempt ${attempt + 1})`,
-      await res.text().catch(() => "<unreadable>"),
-    );
-
-    if (res.status !== 429 && res.status !== 503) break;
+    if (res?.ok) break;
+    if (lastStatus === 401 || lastStatus === 403) break;
   }
 
   if (!res?.ok) {
     if (lastStatus === 401 || lastStatus === 403) {
-      // Say this plainly in the server log. The response body above carries
-      // Google's own reason code, but a bare "HTTP 401" next to a fallback
-      // notice reads like a hiccup, and the key stays broken for hours.
       console.error(
         `[hubby] Gemini rejected GEMINI_API_KEY (HTTP ${lastStatus}). The key is wrong, revoked, ` +
           `or not allowed to call the Generative Language API. Issue a new key in Google AI Studio.`,
@@ -167,6 +186,7 @@ export async function askGemini(message: string, history: HubbyTurn[]): Promise<
     const busy = lastStatus === 429 || lastStatus === 503;
     throw new GeminiError(busy ? "busy" : "upstream", `Gemini returned HTTP ${lastStatus}`);
   }
+
 
   const payload = (await res.json().catch(() => null)) as GeminiResponse | null;
   if (!payload) throw new GeminiError("malformed", "Gemini response was not JSON");
