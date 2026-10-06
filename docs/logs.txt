@@ -1953,3 +1953,120 @@ Actions Taken:
 * Ran `npm run build` — exit 0, server bundle and .output/nitro.json regenerated
 * Verified the built login chunk (.output/public/assets/login-B3PODlJ4.js) references "/onboarding", and that .output/public/assets/onboarding-store-Bstm17DA.js carries the "markethub.onboarding" key
 * Committed as 86ed94b
+
+================================================================================
+[2026-10-06T11:56:31+05:30] Fix rejected push; recover source deleted by 1e185c3b
+================================================================================
+User Prompt (verbatim):
+PS C:\Users\manik\OneDrive\Desktop\Team-51> git push -u origin main
+To https://github.com/AbhinavRangoju/Team-51.git
+ ! [rejected]          main -> main (non-fast-forward)
+error: failed to push some refs to 'https://github.com/AbhinavRangoju/Team-51.git'
+hint: Updates were rejected because a pushed branch tip is behind its remote
+hint: counterpart. If you want to integrate the remote changes, use 'git pull'
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+
+Helppp
+
+Agent Response:
+The push failure itself was benign, but investigating it uncovered a far more
+serious problem on the Frontend branch.
+
+Cause of the rejection: the work is on branch Frontend, while `git push -u origin
+main` pushes the local `main` ref. Local main was still the original starter
+commit 6712750 ("build secure official starter repo"), 34 commits behind
+origin/main and with zero commits of its own. Git correctly refused to move
+origin/main backwards. Pushed Frontend instead (73131f9..1e185c3b) and
+fast-forwarded local main to origin/main (6712750..86e55b4f) with
+`git fetch origin main:main`, which is lossless because local main had no unique
+commits. origin/main has since absorbed PR #2 from the backend branch.
+
+The serious finding: commit 1e185c3b "pushing" by kartikeya-ftw changed 30031
+files, +3737803/-4031. It deleted .gitignore, package.json, package-lock.json,
+.env.example, SECURITY_ARCHITECTURE.md, TEST.md,
+docs/TECHNICAL_SECURITY_DOCUMENTATION.md, src/components/auth/AuthPanel.tsx,
+src/components/auth/CharacterScene.tsx, src/components/mh/AIAssistant.tsx,
+src/components/mh/DashShell.tsx, src/components/mh/LegalPage.tsx,
+src/components/mh/ProductCard.tsx and all 12 src/assets/*.jpg images from BOTH
+the working tree and the index — 25 files in total — and committed .env, 142
+.output files and 29876 node_modules files in their place. With .gitignore gone
+nothing was holding any of it back. The deletions are on disk as well as in git,
+so this was a filesystem-level loss (the repo lives under OneDrive, a plausible
+cause) that the commit then recorded. I had already pushed that commit at the
+start of this turn before inspecting its contents, which was my error.
+
+SECURITY: .env contained a live GEMINI_API_KEY (53-character value, not echoed
+here) and is now in the pushed history of origin/Frontend. Removing it in a later
+commit does not undo that. Told the user to revoke and reissue the key at
+https://aistudio.google.com/apikey as the only real remediation. A history
+rewrite (git filter-repo or BFG plus a force push) would be needed to purge the
+blob itself; that is destructive to a branch teammates share, so it was NOT
+performed and is left as an explicit decision for the team.
+
+Repair performed (non-destructive, a new commit on top — no history rewrite):
+restored all 25 files from 6a6527c with `git checkout 6a6527c -- <paths>`, then
+`git rm -r --cached node_modules .output` and `git rm --cached .env` so the junk
+is untracked while .env stays on disk for local use. The restored .gitignore
+already contained the correct rules — node_modules/, .output/, .env, .env.* with
+a !.env.example negation under a "never commit these" comment — so deleting it
+was the single root cause of the leak, and restoring it closes the hole.
+Confirmed with git check-ignore that .env, node_modules and .output are ignored
+again. Also confirmed the onboarding sign-in gate survived the restore:
+postLoginPath is still imported at AuthPanel.tsx line 5 and used at line 190.
+
+Agent Response Summary:
+Diagnosed the rejected push as a branch mix-up (work on Frontend, stale local
+main 34 commits behind origin/main) and resolved it by pushing Frontend and
+fast-forwarding local main. While verifying the state, found that commit
+1e185c3b had deleted 25 source and config files from both disk and git and
+committed .env, .output and 29876 node_modules files instead, leaving the branch
+unbuildable and leaking a live GEMINI_API_KEY. Restored all 25 files from
+6a6527c, untracked the junk, kept .env on disk, and verified recovery with tsc
+(the same 11 pre-existing errors in the vendored calendar.tsx and chart.tsx, zero
+elsewhere) and a successful npm run build. Key rotation was flagged as urgent and
+a history rewrite was deliberately left to the team as a destructive, shared
+branch decision.
+
+Commit SHA:
+18d520d8 (repair) — also pushed 1e185c3b and fast-forwarded local main this turn
+
+Files Modified / Created:
+* .gitignore (Restored)
+* .env.example (Restored)
+* package.json (Restored)
+* package-lock.json (Restored)
+* SECURITY_ARCHITECTURE.md (Restored)
+* TEST.md (Restored)
+* docs/TECHNICAL_SECURITY_DOCUMENTATION.md (Restored)
+* src/components/auth/AuthPanel.tsx (Restored)
+* src/components/auth/CharacterScene.tsx (Restored)
+* src/components/mh/AIAssistant.tsx (Restored)
+* src/components/mh/DashShell.tsx (Restored)
+* src/components/mh/LegalPage.tsx (Restored)
+* src/components/mh/ProductCard.tsx (Restored)
+* src/assets/hero.jpg, p-bag.jpg, p-books.jpg, p-coffee.jpg, p-headphones.jpg,
+  p-laptop.jpg, p-serum.jpg, p-sneaker.jpg, p-sweater.jpg, p-vase.jpg,
+  p-watch.jpg, p-yoga.jpg (Restored — 12 files)
+* .env (Untracked — kept on disk)
+* node_modules/** (Untracked — 29876 files)
+* .output/** (Untracked — 142 files)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Ran `git fetch origin`, `git branch -vv`, `git branch -r`, `git status --short --branch`
+* Compared branches with `git rev-list --left-right --count` for main...origin/main (0/34) and Frontend...origin/Frontend (6/0)
+* Ran `git merge-base --is-ancestor origin/main Frontend` — origin/main has commits Frontend lacks
+* Pushed Frontend: `git push -u origin Frontend` → 73131f9..1e185c3b
+* Fast-forwarded local main: `git fetch origin main:main` → 6712750..86e55b4f
+* Checked for the gh CLI — not installed, so a PR must be opened via the GitHub web UI
+* Dry-ran the merge with `git merge-tree --write-tree --name-only Frontend main` — exit 1, conflicts in .env.example, .gitignore, docs/logs.txt, node_modules/.package-lock.json, package.json, src/components/auth/AuthPanel.tsx
+* Inspected 1e185c3b with `git show --shortstat` (30031 files, +3737803/-4031) and `git ls-tree --name-only` against 6a6527c to diff the top-level trees
+* Enumerated the 25 deleted non-junk paths and confirmed with Test-Path that they were absent from disk, not merely untracked
+* Listed .env key names only (GEMINI_API_KEY) without echoing the value
+* Restored the 25 paths from 6a6527c; ran `git rm -r --cached node_modules .output` and `git rm --cached .env`
+* Verified with `git check-ignore -v` that .env, node_modules/ and .output/ are ignored again, and that .env remains on disk
+* Confirmed postLoginPath survived in the restored AuthPanel.tsx (lines 5 and 190)
+* Ran `npx tsc --noEmit` — 11 errors, all pre-existing (1 in src/components/ui/calendar.tsx, 10 in src/components/ui/chart.tsx)
+* Ran `npm run build` — succeeded; server bundle and onboarding chunk emitted
+* Committed 18d520d8 and pushed `1e185c3b..18d520d8 Frontend -> Frontend`
