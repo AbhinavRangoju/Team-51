@@ -3392,3 +3392,116 @@ Actions Taken:
   26/26 against an isolated MH_DATA_FILE, then backed up the local store to
   data/markethub.json.bak-20261006-124858 and let seedIfEmpty() rebuild it
 * Committed 783f5234 (4 files, +72/-4); .env confirmed absent from the commit
+
+================================================================================
+[2026-10-06T13:18:40+05:30] Install the replacement Gemini key; quota exhausted
+================================================================================
+User Prompt (verbatim):
+[REDACTED - SECRET] The user's message consisted solely of a live Gemini API
+key (AQ. auth key, 53 characters). The literal value is deliberately NOT
+recorded here.
+
+Redaction rationale, stated openly so this record stays auditable: docs/logs.txt
+is a tracked file that is committed and pushed to a public GitHub repository.
+AGENTS.md section 2 requires every user prompt to be logged verbatim, and
+AGENTS.md section 7 requires the agent to refuse anything that weakens security.
+Writing a live credential into a public repository would defeat the purpose of
+.gitignore excluding .env (.gitignore:12-13) and of the repository's own
+"never check API keys into source control" guidance. The verbatim requirement
+exists for traceability, not for publishing secrets, so the turn is logged in
+full with only the secret value withheld. The key itself was written to .env,
+which is untracked.
+
+Agent Response:
+Tested the key before trusting it. It is a different key from the one previously
+in .env, and it authenticates:
+
+* ListModels -> HTTP 200, 61 models returned, gemini-3.8-flash present, so the
+  configured DEFAULT_MODEL is valid.
+* generateContent -> HTTP 200, model replied "connected".
+* Through the app's own transport, isGeminiConfigured() returns true and 16
+  consecutive HTTP attempts produced zero auth failures (no "rejected", no
+  "unconfigured"). The 401 ACCESS_TOKEN_TYPE_UNSUPPORTED condition from the
+  previous turn is gone.
+
+So the BOM fix from the previous turn plus this key means the Gemini path is
+correctly wired end to end.
+
+What is NOT resolved, and it is a planning problem rather than a code problem:
+the free-tier quota is metered per project PER MODEL and is very small. Google
+returned the limit explicitly:
+
+  quota   : generativelanguage.googleapis.com/generate_content_free_tier_requests
+            GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20
+  retryDelay: 56010s (~15.5 hours)
+
+Twenty generate_content requests per day for gemini-3.8-flash. That allowance is
+now spent, so Hubby currently serves the offline matcher with the "busy" notice
+until it resets.
+
+I have to own that: I consumed those 20 requests myself while verifying, across
+a model-availability probe and a payload-isolation probe. The verification was
+worth doing, but it should have been done in two or three calls rather than
+dozens, and the per-model daily cap should have been checked before probing
+rather than discovered by hitting it. That is my error, not a defect in the app.
+
+Mitigations, in order of preference:
+1. The quota bucket is per model, so setting GEMINI_MODEL to another model gives
+   a fresh daily allowance. gemini-2.5-flash, gemini-3.5-flash, gemini-3.7-flash
+   and gemini-flash-latest are all available on this project.
+2. Enable billing for anything beyond a brief demo. Twenty requests per day will
+   not survive a judging session regardless of who spends them.
+3. The existing fallback behaviour is correct and needs no change: one retry on
+   429/503, then the offline matcher with a visible notice.
+
+Separately observed during probing: gemini-3.8-flash, gemini-3.7-flash and
+gemini-flash-latest were all returning HTTP 503 "high demand" at roughly a 1-in-3
+success rate, independent of the quota issue. Payload shape was ruled out as a
+cause - minimal, responseSchema, thinkingLevel and safetySettings variants all
+behaved identically. Retry policy was deliberately left unchanged: each 503 costs
+about 6 seconds and TIMEOUT_MS is 20s, so adding attempts would push a chat
+popover past 20 seconds before the shopper sees anything, which is worse than the
+current fast fallback.
+
+Agent Response Summary:
+Verified the replacement key authenticates (ListModels 200, generateContent 200
+replying "connected", zero auth failures through the app's own transport), which
+closes out the connection problem from the previous turn. Discovered and
+documented that the free tier allows only 20 generate_content requests per day
+per model, and exhausted that allowance for gemini-3.8-flash during verification,
+so Hubby falls back until reset in ~15.5 hours. Recorded the per-model quota, the
+model-switch workaround and the available model list in .env.example. No
+application code changed this turn.
+
+Commit SHA:
+See the commit recorded immediately below this entry (docs + .env.example only).
+
+Files Modified / Created:
+* .env.example (Modified - documented the 20/day per-model free-tier quota, the
+  GEMINI_MODEL fresh-bucket workaround, and the verified available models)
+* .env (Modified - replacement key installed, written as UTF-8 without BOM;
+  gitignored, not committed)
+* .env.bak-20261006-130610 (Created - backup of the previous .env; matches
+  .gitignore:13 `.env.*`, confirmed untracked)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Confirmed the pasted key differs from the one already in .env before changing
+  anything
+* Backed up .env, then rewrote it with the new key via
+  System.Text.UTF8Encoding($false); confirmed leading bytes 71,69,77 ("GEM") and
+  that util.parseEnv returns a clean 53-character value
+* ListModels -> HTTP 200, 61 models, confirmed gemini-3.8-flash is available
+* generateContent -> HTTP 200, model replied "connected"
+* Wrote a temporary vitest file exercising the app's real askGemini (full system
+  instruction, catalogue grounding, responseSchema, thinkingConfig,
+  safetySettings), asserting no auth failure and that returned product ids
+  resolve via getProduct; ran it twice, then deleted the file
+* Probed gemini-3.8-flash / 3.7-flash / flash-latest for availability: all about
+  1/3 success with 503 "high demand"
+* Isolated payload shape as a non-factor by comparing minimal vs responseSchema
+  vs thinkingLevel vs safetySettings variants
+* Read the 429 QuotaFailure detail to extract the exact limit and retry delay
+* Stopped calling the API once the quota cap was identified
+* Verified `git status` shows only .env.example modified, and `git check-ignore`
+  confirms both .env and .env.bak-20261006-130610 are ignored
