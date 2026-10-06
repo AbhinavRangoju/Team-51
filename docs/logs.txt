@@ -4634,3 +4634,171 @@ Actions Taken:
   26/26 against an isolated MH_DATA_FILE, then backed up the local store to
   data/markethub.json.bak-20261006-124858 and let seedIfEmpty() rebuild it
 * Committed 783f5234 (4 files, +72/-4); .env confirmed absent from the commit
+
+================================================================================
+[2026-10-06T13:43:33+05:30] Pull from and push to main (Team 51 repo)
+================================================================================
+User Prompt (verbatim):
+pull from main(team 51 repo) and push to main(team 51 repo)
+
+Agent Response:
+Done. origin/main == local main at 5f5fb120, 0 ahead / 0 behind, verified by a
+post-push fetch.
+
+This was NOT a fast-forward. Local main had DIVERGED from origin/main by 5
+commits ahead / 13 behind, so it required two merges (a teammate pushed again
+mid-operation and rejected the first push attempt).
+
+PRE-FLIGHT - why `git pull` was not run blind:
+1. A workflow (wf_5081cda442421d52, Neon DB integration) was mid-run. The
+   incoming commits change src/, and this log already records a build broken by
+   a teammate switching branches mid-build. The workflow was PAUSED first. It
+   was still on the read-only planner step, so no coder write was interrupted.
+2. docs/logs.txt was dirty AND was one of the files the incoming merge touches,
+   which would have made git refuse the merge outright. It was committed first
+   as 3c612296.
+3. Verified our 5 local-only commits touch ZERO src/ files (docs/ and .agents/
+   only), which proved the 13 incoming src/ commits could not conflict with our
+   work. Merge base: 86e55b4f.
+
+MERGE 1 - origin/main b9c14cc4 -> ff6591df
+  Exactly one conflict: docs/logs.txt. docs/APPROACH.md auto-merged (only our
+  side had changed it since the base). All 7 incoming src/ files applied clean.
+  Resolved docs/logs.txt as a UNION: ours 11 entries + theirs 1 entry, with a
+  seam note recording the true chronological order.
+  IMPORTANT FINDING: stage 3 (origin/main) was NOT a strict append onto the
+  merge base - 2084 of the first 2694 lines differed in position, the signature
+  of the earlier union merge on the main line reordering shared blocks. A
+  prefix-based resolution would therefore have been wrong, so the result was
+  verified by ENTRY-HEADER CENSUS instead:
+    base 39 / ours 50 / theirs 47 headers
+    missing from result: base 0, ours 0, theirs 0
+    expected union 39 + 11 ours-only + 8 theirs-only = 58, +1 new seam note = 59
+    actual result = 59 unique headers. Exact match. Nothing lost.
+  A first census run falsely reported 14 lost entries; every one contained an
+  em dash. Cause was an encoding artifact - `git show >` wrote the stage files
+  in a different encoding than the UTF-8 result file. Re-ran the census reading
+  raw bytes as UTF-8 with non-ASCII normalised, which cleared it to zero. The
+  false positive was chased down rather than assumed benign.
+
+MERGE 2 - first push REJECTED (fetch first); a teammate had pushed 2 commits
+  while merge 1 was being verified. Did NOT force push. Fetched, inspected,
+  merged origin/main 830115e9 -> 5f5fb120. docs/logs.txt auto-merged clean this
+  time. Final log state: 61 unique entry headers, 0 conflict markers, all 7
+  AGREEMENT RECORDED lines intact, both seam notes intact.
+
+SAFETY GATE BEFORE EACH PUSH: `git merge-base --is-ancestor origin/main HEAD`
+  confirmed all remote commits were contained in HEAD, so no teammate work
+  could be dropped. Merge commits confirmed to have 2 parents each.
+
+VERIFICATION ON THE MERGED TREE (baseline held, zero regressions):
+  npx tsc --noEmit  -> 11 errors, identical to the documented baseline
+                       (10 src/components/ui/chart.tsx, 1 calendar.tsx;
+                       pre-existing stale shadcn wrappers, not route-imported)
+  npx vitest --run  -> 2 files, 26/26 passing
+  npm run build     -> exit 0, .output/server/index.mjs 26,016 bytes,
+                       70 client assets; only upstream react-query
+                       "use client" directive warnings
+  Ran twice, once after each merge. Temporary MH_DATA_FILE used and deleted.
+
+src/routeTree.gen.ts was deliberately left UNSTAGED: the build regenerated it
+and its content diff under --ignore-all-space is EMPTY (CRLF only). Confirmed
+the staged version still carries the /onboarding route. Consistent with the
+team's standing decision not to commit a line-ending-only change.
+
+CRITICAL SECURITY FINDING - ACTION REQUIRED BY THE TEAM:
+  `.env` was committed and pushed to the PUBLIC repository in commit 1e185c3b
+  ("pushing"). A later commit (18d520d8) untracked it, but a git blob is
+  permanent - the value is still retrievable from history by anyone.
+  Exposed: GEMINI_API_KEY, value length 53.
+  THAT KEY MUST BE ROTATED. Untracking the file did not undo the disclosure.
+  Confirmed NOT exposed: .env is no longer tracked on origin/main, .gitignore
+  correctly covers .env / .env.*, and today's Neon connection string was never
+  committed in any branch (`git log --all -S "neon.tech"` returned nothing).
+  Also re-confirmed no credentialed connection string exists in any tracked
+  file via `git grep -E "postgres(ql)?://[^ ]*:[^ ]*@"`.
+
+INCOMING WORK THAT DIRECTLY AFFECTS THE NEON TASK:
+  Commit 783f5234 adds src/lib/server/env.ts exporting serverEnv(name). Its
+  rationale: nitro loads .env via node:util.parseEnv, which does NOT strip a
+  UTF-8 BOM, so a BOM-saved .env attaches the BOM to the FIRST key and
+  process.env.NAME silently reads undefined. That is exactly the runtime risk
+  raised with the planner earlier, now with a confirmed cause and an existing
+  fix. Checked the user's .env: first bytes are 44 41 54 ("DAT"), so NO BOM and
+  it works today - but DATABASE_URL is the only key, so it sits in precisely
+  the first-key position that breaks if the file is ever re-saved with a BOM.
+  The workflow was therefore instructed to read DATABASE_URL through
+  serverEnv() rather than process.env, and briefed on all 15 merged commits
+  (new onboarding flow, AuthPanel first-run routing, the teammate's .env.example
+  BOM guidance which must not be reverted), then resumed.
+
+Agent Response Summary:
+Merged 15 commits from origin/main into local main across two merges and pushed
+successfully; origin/main and local main are now identical at 5f5fb120 with a
+clean verification baseline. Paused the running Neon workflow before touching
+git so no agent was writing source during the merge, and resumed it afterwards
+with a full briefing on the changed tree. Resolved the single docs/logs.txt
+conflict as a union proven complete by entry-header census (0 entry headers lost
+from any merge stage), after tracing a false "14 entries lost" result to an
+encoding artifact rather than accepting it. Surfaced a critical pre-existing
+disclosure: GEMINI_API_KEY was committed to the public repo in 1e185c3b and
+must be rotated.
+
+Commit SHA:
+3c612296 (pre-merge log commit)
+ff6591df (merge 1: onboarding flow + frontend/backend work, 2 parents)
+5f5fb120 (merge 2: hubby BOM-tolerant env reader, 2 parents) - PUSHED
+plus the commit recorded in the COMMIT RECORD below for this entry
+
+Files Modified / Created:
+* docs/logs.txt (Modified - union merge resolution, two seam notes, this entry)
+* docs/APPROACH.md (Modified - auto-merged by git, ours retained)
+* docs/TECHNICAL_SECURITY_DOCUMENTATION.md (Created - incoming from origin/main)
+* .env.example (Modified - incoming, teammate's BOM guidance)
+* src/lib/server/env.ts (Created - incoming, serverEnv BOM-tolerant reader)
+* src/lib/hubby/ask.ts (Modified - incoming)
+* src/lib/hubby/gemini.ts (Modified - incoming)
+* src/components/auth/AuthPanel.tsx (Modified - incoming)
+* src/components/onboarding/Onboarding.tsx (Created - incoming)
+* src/components/onboarding/Illustrations.tsx (Created - incoming)
+* src/components/onboarding/slides.ts (Created - incoming)
+* src/lib/onboarding-store.ts (Created - incoming)
+* src/routes/onboarding.tsx (Created - incoming)
+* src/styles.css (Modified - incoming)
+* src/routeTree.gen.ts (Modified - incoming; a later CRLF-only regeneration
+  left intentionally UNSTAGED)
+
+Actions Taken:
+* inspect_workflow wf_5081cda442421d52; update_workflow -> paused BEFORE any git
+  mutation, to stop the coder step starting mid-merge
+* git fetch origin --prune; git rev-list --left-right --count -> 13 behind, 5 ahead
+* git diff --name-only origin/main...HEAD -- src/ -> empty, proving no src/ conflict
+* git merge-base -> 86e55b4f
+* git add docs/logs.txt; git commit -> 3c612296 to clear the dirty-file block
+* git merge origin/main -> 1 conflict (docs/logs.txt only)
+* git cat-file blob :1/:2/:3 to extract merge stages as raw bytes
+* Compare-Object prefix tests; detected theirs was NOT base+append (2084 lines
+  differing in position) and switched resolution strategy accordingly
+* Built the union by hand: 3161 auto-merged + 1203 ours + seam note + 106 theirs
+* Entry-header census, twice; second run byte-accurate -> 0 lost from any stage
+* Wrote the result as UTF-8-no-BOM with CRLF; verified 0 conflict markers and
+  0 non-ASCII characters in the authored seam note
+* npx tsc --noEmit, npx vitest --run, npm run build (after each merge)
+* git diff --ignore-all-space -- src/routeTree.gen.ts -> empty, left unstaged
+* git commit --no-edit -> ff6591df; verified 2 parents
+* git push origin main -> REJECTED (non-fast-forward); did NOT force
+* git fetch; git merge origin/main -> 5f5fb120; verified 2 parents
+* git merge-base --is-ancestor origin/main HEAD before pushing -> contained
+* git push origin main -> confirmed by fetch: origin/main == HEAD, 0/0
+* Secret audit: git log --all --diff-filter=A -- .env; read .env at 1e185c3b
+  reporting KEY NAMES and value LENGTH only, never the value; git log --all
+  -S "neon.tech"; git grep for credentialed URLs; .env BOM byte inspection
+* Read src/lib/server/env.ts; send_message to the planner session with the
+  serverEnv requirement, the 15-commit tree delta and the verification baseline
+* update_workflow -> running; confirmed the run is moving
+* A first attempt to append this entry failed on a typo in my own command
+  (System.Text.UTF8Engine); verified it wrote nothing (4636 lines unchanged,
+  61 headers, clean git status) before retrying via a staged temp file
+* Deleted temporary files .mergetmp/, tc.log, test.log, build.log, .logentry.tmp
+* NO force push, NO reset, NO history rewrite, NO branch deletion
+* metadata/submission.yaml NOT touched
