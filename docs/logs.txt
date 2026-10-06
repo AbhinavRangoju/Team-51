@@ -2637,3 +2637,167 @@ b620da743fb595ec97e86c95b56bf29fc53b6c91
 
 Push / submission:
 NOT pushed. metadata/submission.yaml was NOT modified, per explicit instruction.
+
+================================================================================
+[2026-10-06T12:14:00+05:30] Post-hack Phase 1: product APIs
+================================================================================
+User Prompt (verbatim):
+I have 10 minutes.
+
+This is POST-HACKATHON work only. Do NOT modify the frozen submission SHA or hackathon branch.
+
+I am backend-only.
+
+Implement ONLY Phase 1 Product APIs from the plan:
+
+- Public product listing
+
+- Public product details
+
+- Search/filter/sort with strict validation
+
+- Vendor product listing
+
+- Vendor create product
+
+- Vendor update product
+
+- Vendor archive product
+
+- Strict vendor ownership checks
+
+- Only approved/verified vendors can modify products
+
+- Product DTOs must not expose sensitive user/vendor data
+
+- No client-controlled vendorId, ownerId, stock, rating, review count, or status
+
+- Archived/unverified products must not appear publicly
+
+Reuse the existing authentication, authorization, validation, DTO and error-handling patterns.
+
+Add only the essential tests for:
+
+- public access
+
+- vendor ownership
+
+- cross-vendor IDOR
+
+- unauthorized customer access
+
+- pending/suspended vendor rejection
+
+- mass-assignment attempts
+
+Do NOT touch frontend code.
+
+Do NOT add AI.
+
+Do NOT refactor unrelated code.
+
+Do NOT migrate the database.
+
+Do NOT spend time on documentation.
+
+Implement it now and then immediately report:
+
+- files changed
+
+- tests passed/failed
+
+- build status
+
+- what remains unfinished.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Created the isolated linked worktree
+C:\Users\Vivek\OneDrive\Desktop\Team-51-posthack on branch
+post-hack/backend-product-apis directly from frozen SHA ae2fb5c. The frozen
+submission checkout and hackathon branch were not modified. Existing node_modules
+were exposed to the worktree via an untracked junction only; no dependency was
+added.
+
+Implemented only Phase 1 product APIs:
+* src/lib/api/products.ts — public list/detail; validated public filters for q,
+  category, vendor ID, price bounds, integer rating, in-stock/sale toggles,
+  allowlisted sort and bounded paging; vendor list/create/update/archive.
+* Writes derive the vendor from the authenticated session. New requireApprovedVendor
+  enforces both vendor role/linkage and Verified status/verified flag. Pending,
+  rejected and suspended vendors cannot create/update/archive listings.
+* Cross-vendor product access uses requireOwnedProduct and returns not-found.
+* New strictObj validation helper rejects unknown/mass-assignment fields. Product
+  create/update reject vendorId, ownerId, stock, rating, reviews, status, SKU and
+  client IDs. New product stock is server-set to 0; inventory adjustment is
+  deliberately deferred to a dedicated future audited workflow.
+* Product IDs and SKUs are server-generated. Ratings/review counts/status are
+  server-owned. Archive sets Archived instead of deleting historical data.
+* Public products require Active status plus an approved/verified vendor. Public
+  DTO omits vendor user ID/email, product vendorId, exact stock, SKU and lifecycle
+  status; it returns only safe vendor name/city/verified data and boolean inStock.
+* src/server.ts imports the backend-only product module so TanStack emits all six
+  server functions without touching any frontend route/component. Production
+  output confirmed 18 function IDs (12 existing + 6 product functions) and a
+  products server chunk.
+* src/test/products.test.ts added nine focused tests: public visibility/DTO,
+  bounded filters, verified/pending/suspended vendor gating, cross-vendor IDOR,
+  strict create/update mass assignment and prototype-pollution-shaped spec keys.
+* vitest.server.config.ts runs server tests under Node. The linked worktree's
+  standard jsdom config externalizes node builtins through the node_modules
+  junction; this backend-specific config avoids that environment artifact.
+
+Caught and fixed one requirement conflict during implementation: initial product
+create/update accepted stock, which contradicts the prompt's no client-controlled
+stock rule. Stock was removed from both contracts; new products start at zero.
+
+Verification:
+* `npx vitest --run --config ./vitest.server.config.ts` with a fresh temporary
+  MH_DATA_FILE: 2 files, 34/34 tests passed (25 pre-existing backend tests + 9
+  product tests).
+* Production build: exit 0; .output/server/index.mjs produced.
+* Typecheck: no new errors. The only remaining typecheck errors are the two
+  pre-existing stale shadcn wrappers (calendar.tsx/chart.tsx).
+* git diff --check: clean.
+
+Agent Response Summary:
+Completed only the requested post-hack Product API phase in a separate worktree,
+with strict input contracts, verified vendor write gating, ownership controls,
+archive semantics and safe public DTOs. No frontend, AI, database migration,
+cart/address/vendor-registration/admin work or frozen-submission source changed.
+Phase 1 code commit is 6b94b0008cef0b5c0cf60354366baa6b1bcc9716.
+
+Commit SHA:
+6b94b0008cef0b5c0cf60354366baa6b1bcc9716 (post-hack Phase 1 code)
+
+Files Modified / Created:
+* src/lib/api/products.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/lib/server/validate.ts (Modified)
+* src/server.ts (Modified — server-only registration)
+* src/test/products.test.ts (Created)
+* vitest.server.config.ts (Created)
+* docs/logs.txt (Modified — post-hack branch log only)
+
+Actions Taken:
+* Created isolated linked worktree from frozen SHA ae2fb5c
+* Reused current auth, guard, validation, DTO, transaction and error patterns
+* Implemented six emitted product server functions
+* Ran product/backend Node test config using fresh temporary persistence
+* Built the production bundle and verified emitted product server functions
+* Kept no source changes in the original hackathon checkout
+* Did not push
