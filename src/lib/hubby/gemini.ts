@@ -12,6 +12,7 @@
  * https://ai.google.dev/gemini-api/docs/generate-content/text-generation
  */
 
+import { serverEnv } from "@/lib/server/env";
 import { HUBBY_LIMITS, type HubbyTurn } from "./contract";
 import {
   buildGroundingTurn,
@@ -27,6 +28,14 @@ const TIMEOUT_MS = 20_000;
 /** Why a Gemini call could not be completed. Shapes the UI's fallback notice. */
 export type GeminiFailure =
   | "unconfigured"
+  /**
+   * 401/403 — a key is present but Google refused it: wrong value, revoked,
+   * or not permitted to call the Generative Language API. Kept separate from
+   * `upstream` because this never clears on its own. Reporting it as a
+   * transient blip sends whoever is debugging looking for a network fault
+   * when the real fix is to issue a working key.
+   */
+  | "rejected"
   | "blocked"
   | "upstream"
   /** 429 quota exhausted, or 503 model overloaded, after retries. */
@@ -51,7 +60,7 @@ export type GeminiDraft = {
 };
 
 export function isGeminiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY?.trim());
+  return Boolean(serverEnv("GEMINI_API_KEY"));
 }
 
 type GeminiPart = { text?: string };
@@ -74,10 +83,10 @@ function buildContents(history: HubbyTurn[], message: string) {
 }
 
 export async function askGemini(message: string, history: HubbyTurn[]): Promise<GeminiDraft> {
-  const key = process.env.GEMINI_API_KEY?.trim();
+  const key = serverEnv("GEMINI_API_KEY");
   if (!key) throw new GeminiError("unconfigured", "GEMINI_API_KEY is not set");
 
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  const model = serverEnv("GEMINI_MODEL") || DEFAULT_MODEL;
 
   // The catalogue rides in the system instruction, not in `contents`. That is
   // the trust boundary: system instruction is content we authored, `contents`
@@ -145,6 +154,16 @@ export async function askGemini(message: string, history: HubbyTurn[]): Promise<
   }
 
   if (!res?.ok) {
+    if (lastStatus === 401 || lastStatus === 403) {
+      // Say this plainly in the server log. The response body above carries
+      // Google's own reason code, but a bare "HTTP 401" next to a fallback
+      // notice reads like a hiccup, and the key stays broken for hours.
+      console.error(
+        `[hubby] Gemini rejected GEMINI_API_KEY (HTTP ${lastStatus}). The key is wrong, revoked, ` +
+          `or not allowed to call the Generative Language API. Issue a new key in Google AI Studio.`,
+      );
+      throw new GeminiError("rejected", `Gemini rejected the API key (HTTP ${lastStatus})`);
+    }
     const busy = lastStatus === 429 || lastStatus === 503;
     throw new GeminiError(busy ? "busy" : "upstream", `Gemini returned HTTP ${lastStatus}`);
   }
