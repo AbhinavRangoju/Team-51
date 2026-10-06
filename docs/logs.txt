@@ -3157,3 +3157,111 @@ Actions Taken:
 * Compared the implemented backend against Member 1's full ownership list
 * Checked git status and current HEAD
 * Did not modify source, frontend, architecture, metadata, or submission files
+
+================================================================================
+[2026-10-06T12:18:57+05:30] Merge Frontend into main; all frontend code now on main
+================================================================================
+User Prompt (verbatim):
+merge frontend with main, All frontend code must be in main
+
+Agent Response:
+Done. origin/main and origin/Frontend both now point at merge commit a50f9a67,
+which carries the full frontend (onboarding flow included) on top of the backend
+layer that PR #2 landed.
+
+Strategy: merged main INTO Frontend first so the conflicts were resolved on the
+feature branch, then fast-forwarded main. That kept main free of any conflict
+resolution of its own and guaranteed no teammate commit could be lost — verified
+with `git merge-base --is-ancestor origin/main Frontend` before pushing, and
+origin/main was re-fetched immediately beforehand to confirm it had not moved
+off 86e55b4f. The push was a pure fast-forward adding 12 commits.
+
+Conflict 1 — src/components/auth/AuthPanel.tsx. The backend branch had rewritten
+this file (347 to 288 lines, +80/-129) while the Frontend change was 7 lines, so
+main's version was taken wholesale via `git checkout --theirs` and the onboarding
+gate re-applied on top. main had renamed useSignIn to useLandAfterAuth, made it
+async to await refreshUser(), switched the destination to the role the SERVER
+returns, and deleted the client-side RolePicker because it let a visitor write
+`vendor` straight into their own session. All of that was preserved — the
+RolePicker was NOT reinstated — and the gate went back in as one line plus one
+import:
+
+  const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
+
+The security property is intact: the role still comes only from the server, and
+the localStorage onboarding flag influences first-run routing and nothing else.
+It cannot grant a role or reach a gated route.
+
+Conflict 2 — docs/logs.txt. Both branches had appended independently, producing
+one conflict block: 6 Frontend entries (2026-10-05T21:42:10 to
+2026-10-06T11:56:31) against 11 main entries (2026-10-06T07:49:35 to
+2026-10-06T11:01:12). AGENTS.md section 2 forbids rewriting, reordering or
+deleting prior entries, so every entry from both sides was kept verbatim as two
+whole blocks with a LOG MERGE NOTE at the seam recording why the order is
+block-wise rather than strictly chronological. The two spans interleave in
+wall-clock time; interleaving them entry-by-entry would have meant resequencing
+existing records, so it was deliberately avoided. The file was read and written
+through System.Text.UTF8Encoding to avoid the PowerShell default-codepage
+round-trip mangling the em dashes; confirmed 258 U+2014 characters survive and
+the header still reads "BUILD SECURE 24 — PROMPT & ENGINEERING ACTIVITY LOG".
+
+Incident during the merge: 6 files vanished from the working tree again —
+src/routes/onboarding.tsx, all three src/components/onboarding/* files,
+src/lib/onboarding-store.ts and docs/TECHNICAL_SECURITY_DOCUMENTATION.md. They
+were still tracked in the index and in HEAD, so `git status` reported them as
+unstaged deletions and `git checkout --` restored all 6. This is the second
+disk-level disappearance this session and matches the earlier 1e185c3b incident;
+the repository living inside a OneDrive-synced folder remains the prime suspect
+and the team was advised again to relocate it outside OneDrive.
+
+Agent Response Summary:
+Merged main into Frontend, resolved the two conflicts, then fast-forwarded
+origin/main to the result so all four refs (Frontend, main, origin/Frontend,
+origin/main) sit at a50f9a67. AuthPanel kept main's server-authoritative auth and
+its removal of the client-side RolePicker, with the onboarding gate re-applied as
+a single line; docs/logs.txt kept all 17 entries from both branches verbatim.
+Recovered 6 more files that disappeared from disk mid-merge. Verified with tsc
+(the same 11 pre-existing errors in the vendored calendar.tsx and chart.tsx and
+no others), a successful npm run build, /onboarding present in the regenerated
+route tree, and the built login chunk still referencing /onboarding. Confirmed on
+origin/main: 154 tracked files, all 5 onboarding sources and all 17 backend
+api/server/scripts files present, .env untracked, .env.example tracked,
+node_modules and .output at 0 files.
+
+Commit SHA:
+a50f9a6733c60757245bb920dc0b4f6b224f5c53
+
+Files Modified / Created:
+* src/components/auth/AuthPanel.tsx (Modified — conflict resolved: main's version + onboarding gate)
+* docs/logs.txt (Modified — conflict resolved: both branches' entries preserved)
+* src/routes/onboarding.tsx (Restored after disk deletion)
+* src/components/onboarding/Onboarding.tsx (Restored after disk deletion)
+* src/components/onboarding/Illustrations.tsx (Restored after disk deletion)
+* src/components/onboarding/slides.ts (Restored after disk deletion)
+* src/lib/onboarding-store.ts (Restored after disk deletion)
+* docs/TECHNICAL_SECURITY_DOCUMENTATION.md (Restored after disk deletion)
+* Merged in from main: src/lib/api/{auth,checkout,orders,vendor}.ts,
+  src/lib/server/{db,dto,guards,password,pricing,ratelimit,seed,session,validate}.ts,
+  src/lib/money.ts, src/test/backend.test.ts,
+  scripts/{cookie-check,e2e,find-serverfn-ids,seroval-lite}.mjs,
+  MarketHub_shared_project_roles.md, and updates to src/lib/store.tsx,
+  src/components/mh/RequireAuth.tsx, src/routes/{account,cart,checkout,orders,vendor}.tsx,
+  package.json, package-lock.json, README.md, docs/APPROACH.md, deployment/README.md,
+  .gitignore, .env.example
+
+Actions Taken:
+* Captured pre-merge SHAs (Frontend 88299702, main 86e55b4f) as a recovery point
+* Compared AuthPanel.tsx across merge-base/Frontend/main with `git diff --stat` to size each side's change
+* Read main's useLandAfterAuth to understand the server-authoritative rewrite before resolving
+* Ran `git merge main --no-edit`; confirmed exactly 2 conflicts via `git diff --diff-filter=U`
+* Resolved AuthPanel.tsx with `git checkout --theirs`, then re-added the postLoginPath import and the one-line gate
+* Mapped the logs.txt conflict markers (1621/2073/3147), compared each block's timestamp span, and rebuilt the file as header + Frontend block + merge note + main block using UTF8Encoding
+* Verified zero conflict markers remain and that the seam renders correctly into main's first SESSION START entry
+* Detected 6 unstaged deletions via `git status --porcelain` and restored them with `git checkout --`
+* Ran `npx tsc --noEmit` — 11 errors, all pre-existing (1 calendar.tsx, 10 chart.tsx)
+* Ran `npm run build` — succeeded; confirmed /onboarding in src/routeTree.gen.ts and onboarding chunks emitted
+* Confirmed the built login chunk references /onboarding, and that AuthPanel retains @/lib/api/auth, refreshUser and no RolePicker
+* Committed the merge as a50f9a67; pushed `88299702..a50f9a67 Frontend -> Frontend`
+* Re-fetched origin, re-verified `git merge-base --is-ancestor origin/main Frontend`, then pushed `86e55b4f..a50f9a67 Frontend -> main` (fast-forward, 12 commits)
+* Synced local main with `git fetch origin main:main`; confirmed all four refs at a50f9a67
+* Audited origin/main's tree: 154 files, onboarding and backend both present, .env absent, node_modules/.output at 0
