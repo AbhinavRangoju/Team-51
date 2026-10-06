@@ -7,19 +7,21 @@ import { useStore } from "@/lib/store";
 import { StoreLayout } from "./StoreLayout";
 
 /**
- * Wraps the signed-in customer pages — /account, /orders, /notifications.
+ * Wraps the signed-in pages — /account, /orders, /notifications, /checkout.
  *
- * Two things matter here. First, nothing renders until the store has hydrated
- * from localStorage: the server has no session, so rendering the signed-out
- * state first would flash "please sign in" at a signed-in visitor on every
- * load. Second, the sign-in link carries the current path as `redirect` so the
- * visitor lands back where they were aiming (the /login route validates that
- * value is a same-site path before using it).
+ * Two things matter here. First, nothing renders until the session has been
+ * resolved: `hydrated` now means "the server has told us who you are", so
+ * rendering the signed-out state first would flash "please sign in" at a
+ * signed-in visitor on every load. Second, the sign-in link carries the current
+ * path as `redirect` so the visitor lands back where they were aiming (the
+ * /login route validates that value is a same-site path before using it).
  *
- * This is a navigation guard, not an access control. The session is a
- * localStorage object with no server-side verification, so it keeps honest
- * users on a sensible path and nothing more. Real enforcement would have to sit
- * on whatever API eventually serves this data.
+ * This is still only a navigation guard, and that is fine, because it is no
+ * longer the thing standing between a visitor and the data. Every endpoint
+ * behind these pages calls `requireUser()` server-side and filters by the
+ * session's user id, so hiding or showing this component changes what is
+ * painted, never what can be read. Removing it from devtools reveals an empty
+ * shell, not somebody else's orders.
  */
 export function RequireAuth({
   title = "Sign in to continue",
