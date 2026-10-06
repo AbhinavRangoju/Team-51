@@ -2224,3 +2224,262 @@ Outstanding before the 2026-10-06T11:00:00+05:30 freeze:
 * deployment/README.md has no deployment record.
 * Set NODE_ENV=production on any deployment; that is what enables the Secure
   flag on the session cookie.
+
+================================================================================
+[2026-10-06T10:33:49+05:30] Production-readiness and deployment review; E2E harness
+================================================================================
+User Prompt (verbatim):
+Understood. Ignore the time constraint.
+
+Do not add unnecessary features. Continue with a thorough production-readiness and deployment review.
+
+Verify the current backend implementation end-to-end, including:
+
+- Authentication and session handling
+
+- Server-side roles and authorization
+
+- Vendor ownership isolation
+
+- Server-side pricing and checkout
+
+- Stock consistency and idempotency
+
+- Order state handling
+
+- Input validation
+
+- CSRF protection
+
+- Error handling
+
+- Sensitive data exposure
+
+- Security tests
+
+- Production build
+
+Then verify:
+
+- No secrets/session data/generated runtime data are tracked
+
+- Production configuration is correct
+
+- Secure cookies work correctly in production
+
+- README has the necessary setup/deployment information
+
+- submission.yaml is ready for the final submission requirements
+
+Do not rewrite working code.
+
+Do not add unnecessary dependencies.
+
+Do not weaken any security control.
+
+Do not push or make the final submission commit yet.
+
+Report any real issues you find and fix critical issues before moving forward.
+
+Agent Response:
+Closed the HTTP-layer verification gap reported in the previous turn, then
+completed the production-readiness review. No application logic was rewritten and
+no dependency was added.
+
+HEADLINE: no exploitable security defect was found. Every control held under
+direct attack. The issues found were configuration and documentation defects,
+listed below with severity.
+
+1. END-TO-END HARNESS BUILT (scripts/e2e.mjs) - 110 CHECKS, 0 FAILURES
+The previous turn could not test the HTTP layer because the generated
+server-function endpoint ids were unknown. Resolved by reading the framework:
+* Endpoints live at /_serverFn/<id>; base path from start-plugin-core schema.
+* Ids default to sha256 and appear verbatim in the built server bundle.
+  scripts/find-serverfn-ids.mjs extracts them (12 found).
+* Request body is JSON.stringify(await toJSONAsync({data})) with header
+  x-tsr-serverFn: true. seroval is already installed transitively, so the
+  harness encodes exactly as the real client does rather than approximating.
+* Responses are a seroval {result, error, context} envelope returned with HTTP
+  200 EVEN WHEN THE HANDLER THREW. This mattered: an early version of the
+  harness judged failure by status code, which silently inverted every negative
+  assertion. Fixed by deciding failure on the presence of `error`.
+* fromCrossJSON cannot decode the envelope because it carries a framework
+  plugin ("$TSR/Error") whose plugin list is only reachable inside a Start
+  request context. Rather than skip the check, wrote scripts/seroval-lite.mjs,
+  a minimal decoder for the node types the server actually emits, read off real
+  responses.
+
+Verified against a freshly started PRODUCTION build (110 pass / 0 fail):
+* CSRF (4): default-deny confirmed. A request with no Origin, Referer or
+  Sec-Fetch-Site is rejected 403; Sec-Fetch-Site: cross-site rejected; foreign
+  Origin rejected; same-origin allowed. Read the middleware source to confirm
+  the check order and that allowRequestsWithoutOriginCheck is not set.
+* Privilege escalation (7): role:"admin" in the signup body ignored, account
+  created as customer; forged id ignored; duplicate email, weak password and
+  malformed email rejected.
+* Session cookie (6): HttpOnly, Secure, SameSite=Strict, Path=/ all present on
+  the production build; cookie value carries no readable identity.
+* Authentication (5): forged session id not accepted; me() reports nobody with
+  no cookie; order history requires a session; no password material serialised.
+* Enumeration resistance: wrong password and unknown email return an identical
+  message and neither reveals which half was wrong.
+* Pricing (9): unit price, subtotal, GST, free-delivery threshold and express
+  fee all from stored rows; injected price, unitPricePaise, totalPaise,
+  subtotalPaise and discountPaise change nothing.
+* Input validation (9): qty 0, negative, absurd and non-integer rejected;
+  duplicate lines, empty cart, non-array items, unknown delivery speed rejected.
+* Checkout (13): session required; injected total, status, payment and userId
+  ignored; order ids match MH-[0-9A-F]{10}; stock decrements by exactly the
+  quantity; replayed idempotency key returns the original order and does NOT
+  decrement stock twice; out-of-stock purchase refused; invalid address and
+  unknown payment method rejected.
+* IDOR (11): second shopper sees an empty history; another shopper's order id
+  refused by every order endpoint; refusal never confirms existence; no order
+  data echoed back.
+* Order state machine (9): cancel restores stock and sets Refunded; cancelling
+  twice is idempotent; unknown order id reports not found; a SHIPPED order can
+  no longer be cancelled; a DELIVERED order can neither be cancelled nor
+  advanced.
+* Vendor isolation (12): each seller sees only their own store and listings; a
+  seller cannot advance an order containing none of their products and the
+  refusal does not confirm existence; seller view carries only their own line
+  and omits shopper street address, PIN and phone; no owner email or password
+  material.
+* Error handling (5): no stack traces, absolute paths, source file names,
+  internal module names or secret-looking values in any error body, probed
+  across every endpoint with deliberately malformed input.
+* Logout (2): cookie cleared AND replaying the original session id is rejected,
+  proving revocation is server-side rather than cosmetic.
+* Rate limiting (1): repeated failed logins throttled, observed at 11 attempts.
+
+TWO HARNESS DEFECTS FOUND AND CORRECTED (not product defects)
+a) An enumeration mismatch was reported. Root cause was the login rate limiter
+   engaging across repeated runs against one long-lived process, i.e. the
+   control working. The harness now detects and reports that condition instead
+   of mis-attributing it, and the rate-limit test was moved last because it
+   deliberately exhausts the bucket. Signup's 5/hour limit likewise caused a
+   later crash; the harness now checks that the second account was created and
+   says why if not.
+b) One assertion required "not found" from all three order endpoints. The seller
+   endpoint correctly answers "You do not have access to that." because
+   requireRole("vendor") trips before it ever looks at the order, which reveals
+   nothing about the order. The assertion was too blunt; corrected to test the
+   property that matters - refuses, and never confirms existence or echoes data.
+
+2. REAL ISSUES FOUND
+MEDIUM - engines.node declared ">=20" while @tanstack/start-server-core
+  requires ">=22.12.0". A deploy platform reading engines could legitimately
+  provision Node 20, outside the framework's supported range. FIXED: engines
+  set to ">=22.12.0" and package-lock.json resynced with
+  `npm install --package-lock-only`. Verified the only other lock changes are 6
+  OPTIONAL nested WASM fallback entries under @tailwindcss/oxide-wasm32-wasi;
+  direct dependencies unchanged at 45 prod / 12 dev, nothing removed.
+MEDIUM (documentation correctness) - .env.example and docs/APPROACH.md both
+  claimed NODE_ENV=production must be set to enable the Secure cookie flag.
+  THAT CLAIM WAS WRONG. Verified by running the production bundle with NODE_ENV
+  explicitly unset and reading the raw Set-Cookie: Secure was still present,
+  because Vite inlines process.env.NODE_ENV as "production" at build time. The
+  built server is fail-secure by construction. Both documents corrected, since a
+  wrong security claim is worse than no claim.
+HIGH (operational, not security) - the JSON store defaults to
+  ./data/markethub.json, which on most hosts sits inside the deployed bundle on
+  an ephemeral filesystem. On Render, Railway, Fly without a volume or any
+  container host, every account, session and order is lost on restart or
+  redeploy. Cannot be fixed without knowing the platform, so it is documented as
+  the single most important deployment setting in README, deployment/README.md,
+  .env.example and APPROACH.md.
+MEDIUM - README.md was still the unmodified competition starter with no
+  MarketHub setup, test or deployment information at all. FIXED: added
+  prerequisites, install, verify, harness instructions, environment variable
+  table, demo accounts, project layout, deployment steps and known issues, while
+  keeping the competition reference section intact.
+MEDIUM - deployment/README.md was an empty template. FIXED: environment
+  variable table, persistence warning, numbered build and deploy steps,
+  post-deployment verification commands and a manual checklist.
+LOW - verified and accepted: the seeded demo password is public. Every seeded
+  account holds fictional data and is confined to its own slice by the same
+  authorization checks that protect a real account, which the harness proves.
+  The admin role is handled differently and has no default password at all, so
+  no privileged account can exist by accident. Documented as a deliberate
+  trade-off rather than left implicit.
+
+3. TRACKED-FILE AUDIT - CLEAN
+144 tracked files. Scanned all tracked ts/tsx/js/mjs/json/yaml/md/css for AWS
+keys, OpenAI keys, Google API keys, GitHub tokens, PEM private keys and
+hardcoded password hashes: no matches. Confirmed data/, .env, .env.*,
+node_modules/, .output/ and *.log are all gitignored via git check-ignore. The
+only tracked env file is .env.example, which contains commented placeholders
+only. No generated runtime data is tracked; data/ does not exist in the repo.
+
+4. SUBMISSION READINESS
+metadata/team.yaml - complete, 4 members, satisfies the 2-or-4 rule.
+metadata/submission.yaml - valid structure; team_id and repository populated.
+Three fields remain and are intentionally NOT filled, per instruction not to
+make the final submission commit: commit_sha, deployment_url, submitted_at.
+PARTICIPANT_RULES.md section 6 requires evaluation from the frozen commit SHA,
+so commit_sha must be set to the final commit after deployment.
+
+5. REGRESSION VERIFICATION AFTER ALL CHANGES
+* npx tsc --noEmit - zero errors outside the two known-stale shadcn wrappers
+  (ui/chart.tsx, ui/calendar.tsx), neither imported by any route.
+* npx vitest --run - 26/26 passing.
+* npm run build - clean, emits .output/server/index.mjs (24.2 KB) + 65 assets.
+* scripts/e2e.mjs against the rebuilt production bundle - 110 pass / 0 fail.
+
+NOTE ON REPOSITORY STRUCTURE
+scripts/ holds four verification tools (e2e.mjs, seroval-lite.mjs,
+find-serverfn-ids.mjs, cookie-check.mjs). These are test tooling, not
+application code; all application code remains in src/. They are deliberately
+outside src/ so the Vite bundler does not scan them. Three throwaway
+investigation scripts used to read the framework internals were deleted.
+
+Agent Response Summary:
+Built a 110-check end-to-end security harness that drives the real HTTP
+endpoints of a production build with a real cookie jar and the framework's own
+seroval wire format, closing the session/CSRF verification gap flagged in the
+previous turn. All 110 checks pass and no exploitable security defect was found:
+CSRF is default-deny, role escalation via the request body is ignored, pricing
+and totals are recomputed server-side, stock and idempotency hold, the order
+state machine rejects illegal transitions, vendor isolation withholds other
+sellers' lines and shopper PII, logout revokes server-side, and no internals
+leak in error bodies. Fixed three real configuration and documentation defects:
+an engines.node mismatch against the framework's required runtime, an incorrect
+claim that NODE_ENV gates the Secure cookie flag (disproved by inspecting the
+production bundle's Set-Cookie), and a README plus deployment record that
+contained no project information. Flagged the ephemeral-filesystem persistence
+risk as the highest-impact deployment setting. Tracked-file audit is clean and
+submission.yaml is structurally ready with three fields deliberately left for
+the final submission commit. Nothing pushed.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* scripts/e2e.mjs (Created)
+* scripts/seroval-lite.mjs (Created)
+* scripts/find-serverfn-ids.mjs (Created)
+* scripts/cookie-check.mjs (Created)
+* README.md (Modified - MarketHub setup, env, demo accounts, layout, deployment, known issues)
+* deployment/README.md (Modified - env table, persistence warning, deploy steps, verification)
+* docs/APPROACH.md (Modified - section 6.2 harness results, 6.3 remaining gaps, 6.4 corrected deploy requirements)
+* .env.example (Modified - corrected the NODE_ENV/Secure claim; documented PORT)
+* package.json (Modified - engines >=22.12.0; added serverfn:ids and test:e2e scripts)
+* package-lock.json (Modified - resynced engines; 6 optional nested WASM entries normalised)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read start-plugin-core schema, handleCreateServerFn, compiler.js to learn the /_serverFn base path and sha256 id scheme
+* Read createCsrfMiddleware.js to confirm the Sec-Fetch-Site / Origin / Referer check order and default-deny behaviour
+* Read serverFnFetcher.js to learn the exact POST body encoding and response envelope
+* Wrote scripts/find-serverfn-ids.mjs; extracted 12 endpoint ids from the server bundle
+* Wrote scripts/seroval-lite.mjs after proving fromCrossJSON cannot decode the $TSR/Error plugin envelope
+* Wrote and iterated scripts/e2e.mjs across 5 runs; fixed the status-code-vs-envelope bug, the getQuote/placeOrder discovery collision, the rate-limit ordering, and the over-blunt IDOR assertion
+* Ran the harness against four freshly started production servers (ports 3101-3111); final run 110 pass / 0 fail
+* Wrote scripts/cookie-check.mjs and ran the production bundle with NODE_ENV unset to test the Secure flag claim; disproved it
+* Scanned all 144 tracked files for secret patterns; ran git check-ignore on data/, .env, node_modules, .output, *.log
+* Read PARTICIPANT_RULES.md section 5 and 6 for submission requirements; inspected both metadata YAML files
+* Corrected engines.node and resynced package-lock.json; audited the lock diff to confirm no new direct dependencies
+* Rewrote README.md and deployment/README.md; corrected .env.example and docs/APPROACH.md
+* Deleted 3 throwaway investigation scripts and all scratch output files
+* Re-ran typecheck, vitest, build and the harness after every change
+* Did NOT push and did NOT fill commit_sha, per instruction

@@ -296,29 +296,100 @@ Checkout is the representative path:
   `/orders` and `/account`.
 - **Build:** `npm run build` completes and emits `.output/server/index.mjs`.
 
-### 6.2 Known Verification Gaps
+### 6.2 End-to-End Security Harness — 110 checks, all passing
 
-Stated plainly rather than implied:
+`scripts/e2e.mjs` closes the gap the unit tests cannot reach. It drives the real
+HTTP endpoints against a running production build with a real cookie jar,
+speaking the framework's own seroval wire format, so a pass means a real browser
+would behave the same way. Run instructions are in the README.
 
-- The **HTTP-level session and CSRF path is not covered by an automated test.**
-  The tests exercise the logic beneath it (pricing, stock, ownership, DTO
-  shaping) directly. Cookie issuance and CSRF rejection are framework-provided
-  and were not modified, but "the cookie is actually set and rejected
-  cross-origin" rests on TanStack's behaviour, not on a test in this repository.
-- No **load or concurrency test**. The single-threaded atomicity argument is
-  sound by construction and is covered by a sequential 20-order drain test, but
-  no test launches genuinely parallel requests.
-- The app runs on **Node 20**, while `@tanstack/start-server-core` declares
-  `node >=22.12.0`. Dev server, build and production bundle all work, but the
-  team is running outside the supported engine range.
+What it proves, grouped:
 
-### 6.3 Deployment Verification
+- **CSRF (4):** a request carrying no `Origin`, `Referer` or `Sec-Fetch-Site` is
+  rejected with 403; `Sec-Fetch-Site: cross-site` is rejected; a foreign `Origin`
+  is rejected; a same-origin request is allowed through. The middleware is
+  default-deny, which is the strong posture.
+- **Privilege escalation (7):** `role: "admin"` in the signup body is ignored and
+  the account is created as a customer; a forged `id` is ignored; duplicate
+  email, weak password and malformed email are all rejected.
+- **Session cookie (6):** `HttpOnly`, `Secure`, `SameSite=Strict` and `Path=/`
+  are all present on the production build; the cookie value carries no readable
+  identity.
+- **Authentication (5):** a forged session id is not accepted; `me()` reports
+  nobody without a cookie; order history requires a session; no password
+  material is ever serialised.
+- **Enumeration resistance:** a wrong password and an unknown email return the
+  identical message, and neither reveals which half was wrong.
+- **Pricing (9):** unit price, subtotal, GST, delivery threshold and express fee
+  all come from stored rows; injected `price`, `unitPricePaise`, `totalPaise`,
+  `subtotalPaise` and `discountPaise` fields change nothing.
+- **Input validation (9):** quantity zero, negative, absurd and non-integer are
+  rejected; duplicate product lines, an empty cart, a non-array `items` and an
+  unknown delivery speed are rejected.
+- **Checkout (13):** a session is required; injected `total`, `status`, `payment`
+  and `userId` are ignored; order ids match `MH-[0-9A-F]{10}`; stock decrements
+  by exactly the quantity ordered; a replayed idempotency key returns the
+  original order and does **not** decrement stock twice; an out-of-stock product
+  cannot be bought; invalid addresses and unknown payment methods are rejected.
+- **IDOR (11):** a second shopper sees an empty history; another shopper's order
+  id is refused by every order endpoint, the refusal never confirms the order
+  exists, and no order data is echoed back.
+- **Order state machine (9):** cancelling restores stock and sets `Refunded`;
+  cancelling twice is idempotent rather than an error; an unknown order id
+  reports not found; a **shipped** order can no longer be cancelled; a
+  **delivered** order can neither be cancelled nor advanced further.
+- **Vendor isolation (12):** each seller sees only their own store and listings;
+  a seller cannot advance an order containing none of their products and the
+  refusal does not confirm it exists; the seller's view carries only their own
+  line and omits the shopper's street address, PIN and phone; no owner email or
+  password material appears.
+- **Error handling (5):** no stack traces, absolute filesystem paths, source file
+  names, internal module names or secret-looking values in any error body,
+  probed across every endpoint with deliberately malformed input.
+- **Logout (2):** the cookie is cleared **and** replaying the original session id
+  is rejected, proving revocation is server-side rather than cosmetic.
+- **Rate limiting (1):** repeated failed logins are throttled (observed at 11
+  attempts). Runs last, because it deliberately exhausts the bucket.
+
+Two findings came out of building the harness, both resolved:
+- An early run reported an enumeration mismatch. The cause was the login rate
+  limiter engaging across repeated runs against one long-lived process — the
+  control working correctly, not a defect. The harness now detects and reports
+  that condition instead of mis-attributing it.
+- One assertion demanded "not found" from all three order endpoints. The seller
+  endpoint correctly answers "you do not have access" first, because
+  `requireRole("vendor")` trips before it ever looks at the order — which
+  reveals nothing about the order. The assertion was too blunt and was corrected
+  to test the property that matters: refuses, and never confirms existence.
+
+### 6.3 Remaining Verification Gaps
+
+- **No genuine parallel-concurrency test.** The single-threaded atomicity
+  argument is sound by construction and is covered by a sequential 20-order
+  drain test plus the idempotency replay test, but nothing launches truly
+  simultaneous requests.
+- **Local development runs on Node 20**, while `@tanstack/start-server-core`
+  declares `node >=22.12.0`. `engines` has been corrected to `>=22.12.0` so a
+  deployment provisions a supported runtime, but the machine used to build this
+  is outside that range.
+- **No browser-driven UI test.** The harness exercises the API surface, not
+  React rendering or hydration. Route-level smoke tests confirm every page
+  returns 200 with no error page, in both dev and production builds.
+
+### 6.4 Deployment Verification
 
 - **Live Deployment Platform:** not yet deployed.
 - **Deployment URL:** pending — record in `metadata/submission.yaml` and
   `deployment/README.md`.
-- **Health Check Endpoint:** not implemented.
-- **Pre-deploy requirements:** set `NODE_ENV=production` (this is what enables
-  the `Secure` flag on the session cookie), point `MH_DATA_FILE` at a persistent
-  volume outside the bundle, and leave `MH_ADMIN_PASSWORD` unset unless an admin
-  account is actually wanted.
+- **Health Check Endpoint:** none dedicated. `/` returns 200 and serves as the
+  health check.
+- **Pre-deploy requirements**, in order of importance:
+  1. **Point `MH_DATA_FILE` at a persistent volume.** The default path sits
+     inside the deployed bundle, so on an ephemeral filesystem every account and
+     order is lost on restart. This is the highest-impact deployment setting.
+  2. **Provision Node 22.12+**, now declared in `engines`.
+  3. **Leave `MH_ADMIN_PASSWORD` unset** unless an admin account is wanted.
+  4. `NODE_ENV` does **not** need setting for cookie security — corrected from an
+     earlier claim in this document. Vite inlines it as `"production"` at build
+     time, so the built server always sets `Secure`. Verified by inspecting the
+     raw `Set-Cookie` from the production bundle with `NODE_ENV` unset.
