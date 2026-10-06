@@ -2801,3 +2801,136 @@ Actions Taken:
 * Built the production bundle and verified emitted product server functions
 * Kept no source changes in the original hackathon checkout
 * Did not push
+
+================================================================================
+[2026-10-06T12:29:30+05:30] Post-hack Phase 2: persistent cart APIs
+================================================================================
+User Prompt (verbatim):
+Phase 1 is approved.
+
+Continue with Phase 2 — Persistent Cart APIs.
+
+Backend only. Do not modify frontend code.
+
+Implement:
+
+- getMyCart
+
+- addCartItem
+
+- setCartItemQuantity
+
+- removeCartItem
+
+Requirements:
+
+- Authentication required
+
+- userId always comes from the session
+
+- Never accept userId, vendorId, price, stock or total from the client
+
+- Maximum 50 distinct cart items
+
+- Quantity 1–20
+
+- Product must be active and currently sellable
+
+- Use current server-side product pricing in responses
+
+- Do not reserve stock in the cart
+
+- Keep checkout as the final stock authority
+
+- Prevent cross-user cart access
+
+- Reject unknown/mass-assignment fields
+
+- Add security tests for ownership, validation and malicious input
+
+Reuse the existing patterns from products.ts, guards.ts, validate.ts and db.ts.
+
+Do not change checkout or existing authentication/security behavior.
+
+Implement, test, build, and report the result.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Implemented Phase 2 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, checkout, authentication, frozen
+submission source, database migration, AI or unrelated code was changed.
+
+Implementation:
+* Added CartItemRow and persistent cartItems Map to the JSON store, with
+  userId:productId composite keys, hydration and snapshot persistence.
+* Added getMyCart, addCartItem, setCartItemQuantity and removeCartItem in
+  src/lib/api/cart.ts. All derive userId solely from requireUser() session data.
+* New request contracts use strictObj() and accept only productId/quantity. They
+  reject userId, vendorId, pricePaise, stock, totalPaise, status and all unknown
+  fields. Quantity is validated 1–20.
+* addCartItem merges existing own lines but rejects a merged quantity above 20;
+  rejects a new distinct line after 50.
+* Added isPurchasableProduct: active product, verified/approved vendor and stock
+  above zero are required to add or increase a cart line. Cart stock is NEVER
+  decremented or reserved; checkout remains the final atomic stock authority and
+  was not edited.
+* getMyCart calculates line price and subtotal from current server product rows.
+  Cart does not store price, vendor or total. Unavailable existing lines remain
+  removable but return available:false and null price fields, preventing stale
+  client prices from becoming authoritative.
+* requireOwnCartItem returns not-found for a different user/product pair, which
+  prevents cross-user cart enumeration.
+* Added CartItemDto/CartDto with no userId, vendorId, vendor email or stock.
+* Registered cart APIs in the server entry. Production output contains 22 server
+  functions (18 prior + four cart handlers) and cart server chunk.
+
+Testing:
+* `npx vitest --run --config ./vitest.server.config.ts` with fresh temporary
+  MH_DATA_FILE: 3 files, 41/41 tests passed.
+* Added 7 cart-focused tests for ownership isolation, missing own row,
+  quantity bounds, mass assignment, active/verified/in-stock eligibility,
+  current server price DTOs and unavailable stale cart lines.
+* Typecheck reported no new errors; only the two pre-existing stale shadcn UI
+  wrapper errors remain outside Phase 2.
+* `npm run build`: exit 0 and server bundle present.
+
+Agent Response Summary:
+Completed Phase 2 persistent cart APIs in the separate post-hack branch. Cart
+ownership is session-derived, inputs are strict, current server prices are used
+in DTOs, stock is not reserved, and checkout/auth security behavior stays
+unchanged. Phase 2 source commit is 51525bdfdc080038c10c68f5ff41ab5e86754387.
+
+Commit SHA:
+51525bdfdc080038c10c68f5ff41ab5e86754387 (post-hack Phase 2 code)
+
+Files Modified / Created:
+* src/lib/api/cart.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/server.ts (Modified — server-only cart registration)
+* src/test/cart.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected Phase 1 product/persistence/DTO/guard contracts in isolated worktree
+* Added cart persistence, DTO mapping, guard helpers and four cart server functions
+* Tightened current sellability to require stock > 0 for cart writes without reservation
+* Added focused cart security tests
+* Ran isolated backend/product/cart tests with temporary data
+* Ran production build and verified emitted cart handlers
+* Restored irrelevant generated route-tree line-ending churn
+* Did not push
