@@ -17,6 +17,6 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
-    include: ["src/test/backend.test.ts", "src/test/products.test.ts"],
+    include: ["src/test/backend.test.ts", "src/test/products.test.ts", "src/test/cart.test.ts"],
   },
 });

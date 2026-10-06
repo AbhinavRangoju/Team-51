@@ -74,6 +74,14 @@ export type VendorRow = {
 
 export type ProductStatus = "Active" | "Draft" | "Archived";
 
+export type CartItemRow = {
+  userId: string;
+  productId: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProductRow = {
   id: string;
   vendorId: string;
@@ -145,6 +153,8 @@ type Tables = {
   sessions: Map<string, SessionRow>;
   vendors: Map<string, VendorRow>;
   products: Map<string, ProductRow>;
+  /** userId:productId -> cart line. User ownership is structural, not client supplied. */
+  cartItems: Map<string, CartItemRow>;
   orders: Map<string, OrderRow>;
 };
 
@@ -178,6 +188,7 @@ function emptyDb(): Db {
       sessions: new Map(),
       vendors: new Map(),
       products: new Map(),
+      cartItems: new Map(),
       orders: new Map(),
     },
     emailIndex: new Map(),
@@ -191,6 +202,7 @@ type Persisted = {
   sessions: SessionRow[];
   vendors: VendorRow[];
   products: ProductRow[];
+  cartItems: CartItemRow[];
   orders: OrderRow[];
   seeded: boolean;
 };
@@ -203,6 +215,9 @@ function hydrate(db: Db, raw: Persisted): void {
   for (const s of raw.sessions ?? []) db.t.sessions.set(s.id, s);
   for (const v of raw.vendors ?? []) db.t.vendors.set(v.id, v);
   for (const p of raw.products ?? []) db.t.products.set(p.id, p);
+  for (const item of raw.cartItems ?? []) {
+    db.t.cartItems.set(cartItemKey(item.userId, item.productId), item);
+  }
   for (const o of raw.orders ?? []) {
     db.t.orders.set(o.id, o);
     db.idemIndex.set(o.idempotencyKey, o.id);
@@ -241,6 +256,7 @@ function snapshot(d: Db): Persisted {
     sessions: [...d.t.sessions.values()],
     vendors: [...d.t.vendors.values()],
     products: [...d.t.products.values()],
+    cartItems: [...d.t.cartItems.values()],
     orders: [...d.t.orders.values()],
     seeded: d.seeded,
   };
@@ -292,6 +308,9 @@ export function tx<T>(fn: () => T): T {
 }
 
 export const newId = (): string => randomUUID();
+
+/** Cartesian ownership key: neither userId nor productId arrives from a cart request unchecked. */
+export const cartItemKey = (userId: string, productId: string): string => `${userId}:${productId}`;
 
 /** Order ids are random, not sequential, so one order id never reveals another. */
 export function newOrderId(): string {

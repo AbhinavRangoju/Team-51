@@ -13,7 +13,7 @@
  * `requireVendor` below throws instead. There is no fallback path.
  */
 
-import { db, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
+import { cartItemKey, db, type CartItemRow, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
 import { requireSessionUser, type SessionUser } from "./session";
 import { forbidden, notFound } from "./validate";
 
@@ -53,6 +53,30 @@ export function assertApprovedVendor(vendor: VendorRow): void {
   if (!isApprovedVendor(vendor)) {
     throw forbidden("Your store is not approved to manage products.");
   }
+}
+
+/**
+ * A cart may contain only products that a customer could buy right now.
+ * Stock is deliberately not reserved here; checkout remains the final,
+ * transaction-protected stock authority.
+ */
+export function isSellableProduct(product: ProductRow | undefined, vendor: VendorRow | undefined): boolean {
+  return Boolean(product && vendor && product.status === "Active" && isApprovedVendor(vendor));
+}
+
+/** Cart writes require current stock, but do not reserve it. Checkout re-checks atomically. */
+export function isPurchasableProduct(product: ProductRow | undefined, vendor: VendorRow | undefined): boolean {
+  return Boolean(isSellableProduct(product, vendor) && product && product.stock > 0);
+}
+
+/**
+ * Loads a cart line through the authenticated user's own composite key.
+ * Returning not-found for another user's product id prevents cart enumeration.
+ */
+export function requireOwnCartItem(userId: string, productId: string): CartItemRow {
+  const item = db().t.cartItems.get(cartItemKey(userId, productId));
+  if (!item) throw notFound("Cart item not found.");
+  return item;
 }
 
 /**

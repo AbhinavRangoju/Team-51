@@ -8,7 +8,7 @@
  * column is invisible to the client until someone adds it here on purpose.
  */
 
-import type { OrderRow, ProductRow, UserRow, VendorRow } from "./db";
+import type { CartItemRow, OrderRow, ProductRow, UserRow, VendorRow } from "./db";
 
 export type OrderDto = {
   id: string;
@@ -165,6 +165,72 @@ export const toPublicProductDto = (p: ProductRow, v: VendorRow): PublicProductDt
   createdAt: p.createdAt,
   vendor: { name: v.name, city: v.city, verified: true },
 });
+
+/** Cart DTOs use current server pricing and no account/vendor identifiers. */
+export type CartItemDto = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPricePaise: number | null;
+  linePaise: number | null;
+  available: boolean;
+  vendor: { name: string; city: string } | null;
+};
+
+export type CartDto = {
+  items: CartItemDto[];
+  distinctItems: number;
+  subtotalPaise: number;
+  hasUnavailableItems: boolean;
+};
+
+/**
+ * Current price only; cart lines never snapshot price or reserve stock. An
+ * unavailable historical line remains removable, but cannot be increased.
+ */
+export function toCartDto(
+  items: CartItemRow[],
+  products: Map<string, ProductRow>,
+  vendors: Map<string, VendorRow>,
+  isSellable: (product: ProductRow | undefined, vendor: VendorRow | undefined) => boolean,
+): CartDto {
+  let subtotalPaise = 0;
+  let hasUnavailableItems = false;
+
+  const lines = items
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((item) => {
+      const product = products.get(item.productId);
+      const vendor = product ? vendors.get(product.vendorId) : undefined;
+      const available = isSellable(product, vendor);
+      if (!product || !vendor || !available) {
+        hasUnavailableItems = true;
+        return {
+          productId: item.productId,
+          name: product?.name ?? "Unavailable product",
+          quantity: item.quantity,
+          unitPricePaise: null,
+          linePaise: null,
+          available: false,
+          vendor: vendor ? { name: vendor.name, city: vendor.city } : null,
+        };
+      }
+
+      const linePaise = product.pricePaise * item.quantity;
+      subtotalPaise += linePaise;
+      return {
+        productId: product.id,
+        name: product.name,
+        quantity: item.quantity,
+        unitPricePaise: product.pricePaise,
+        linePaise,
+        available: true,
+        vendor: { name: vendor.name, city: vendor.city },
+      };
+    });
+
+  return { items: lines, distinctItems: lines.length, subtotalPaise, hasUnavailableItems };
+}
 
 export type VendorDto = {
   id: string;
