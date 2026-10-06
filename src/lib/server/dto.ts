@@ -8,7 +8,15 @@
  * column is invisible to the client until someone adds it here on purpose.
  */
 
-import type { AddressRow, CartItemRow, OrderRow, ProductRow, UserRow, VendorRow } from "./db";
+import type {
+  AddressRow,
+  CartItemRow,
+  OrderRow,
+  ProductRow,
+  UserRow,
+  VendorApplicationRow,
+  VendorRow,
+} from "./db";
 
 export type OrderDto = {
   id: string;
@@ -257,6 +265,37 @@ export const toVendorDto = (v: VendorRow): VendorDto => ({
   status: v.status,
   verified: v.verified,
   rating: v.rating,
+});
+
+export type VendorApplicationDto = {
+  id: string;
+  storeName: string;
+  description: string;
+  category: string;
+  phone: string;
+  city: string;
+  status: "Pending" | "Approved" | "Rejected";
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Applicant-facing view. Deliberately omits userId and reviewedByUserId: the
+ * applicant may see their own status and any rejection reason, but not which
+ * internal account reviewed it.
+ */
+export const toVendorApplicationDto = (a: VendorApplicationRow): VendorApplicationDto => ({
+  id: a.id,
+  storeName: a.storeName,
+  description: a.description,
+  category: a.category,
+  phone: a.phone,
+  city: a.city,
+  status: a.status,
+  rejectionReason: a.rejectionReason,
+  createdAt: a.createdAt,
+  updatedAt: a.updatedAt,
 });
 
 export type AddressDto = {

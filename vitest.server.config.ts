@@ -22,6 +22,7 @@ export default defineConfig({
       "src/test/products.test.ts",
       "src/test/cart.test.ts",
       "src/test/addresses.test.ts",
+      "src/test/vendor-registration.test.ts",
     ],
   },
 });

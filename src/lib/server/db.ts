@@ -74,6 +74,27 @@ export type VendorRow = {
 
 export type ProductStatus = "Active" | "Draft" | "Archived";
 
+export type VendorApplicationStatus = "Pending" | "Approved" | "Rejected";
+
+export type VendorApplicationRow = {
+  id: string;
+  /** Owner of the application. One application per user; never client supplied. */
+  userId: string;
+  storeName: string;
+  description: string;
+  category: string;
+  phone: string;
+  city: string;
+  /** Server-controlled lifecycle. A customer can never set or change this. */
+  status: VendorApplicationStatus;
+  /** Set only by an admin review (Phase 5). */
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CartItemRow = {
   userId: string;
   productId: string;
@@ -174,6 +195,8 @@ type Tables = {
   cartItems: Map<string, CartItemRow>;
   /** Random addressId -> address row. Every lookup also proves row.userId. */
   addresses: Map<string, AddressRow>;
+  /** Random applicationId -> application. One per user, enforced on insert. */
+  vendorApplications: Map<string, VendorApplicationRow>;
   orders: Map<string, OrderRow>;
 };
 
@@ -209,6 +232,7 @@ function emptyDb(): Db {
       products: new Map(),
       cartItems: new Map(),
       addresses: new Map(),
+      vendorApplications: new Map(),
       orders: new Map(),
     },
     emailIndex: new Map(),
@@ -224,6 +248,7 @@ type Persisted = {
   products: ProductRow[];
   cartItems: CartItemRow[];
   addresses: AddressRow[];
+  vendorApplications: VendorApplicationRow[];
   orders: OrderRow[];
   seeded: boolean;
 };
@@ -240,6 +265,7 @@ function hydrate(db: Db, raw: Persisted): void {
     db.t.cartItems.set(cartItemKey(item.userId, item.productId), item);
   }
   for (const address of raw.addresses ?? []) db.t.addresses.set(address.id, address);
+  for (const app of raw.vendorApplications ?? []) db.t.vendorApplications.set(app.id, app);
   for (const o of raw.orders ?? []) {
     db.t.orders.set(o.id, o);
     db.idemIndex.set(o.idempotencyKey, o.id);
@@ -280,6 +306,7 @@ function snapshot(d: Db): Persisted {
     products: [...d.t.products.values()],
     cartItems: [...d.t.cartItems.values()],
     addresses: [...d.t.addresses.values()],
+    vendorApplications: [...d.t.vendorApplications.values()],
     orders: [...d.t.orders.values()],
     seeded: d.seeded,
   };

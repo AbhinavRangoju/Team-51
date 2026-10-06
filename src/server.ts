@@ -5,6 +5,7 @@ import "./lib/error-capture";
 import "./lib/api/products";
 import "./lib/api/cart";
 import "./lib/api/addresses";
+import "./lib/api/vendor-registration";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
