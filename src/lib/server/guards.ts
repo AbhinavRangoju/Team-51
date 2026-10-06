@@ -43,6 +43,31 @@ export async function requireVendor(): Promise<{ user: SessionUser; vendor: Vend
   return { user, vendor };
 }
 
+/** A store is sellable/manageable only after server-side verification. */
+export function isApprovedVendor(vendor: VendorRow): boolean {
+  return vendor.status === "Verified" && vendor.verified === true;
+}
+
+/** Pure approval assertion: shared by the authenticated guard and direct tests. */
+export function assertApprovedVendor(vendor: VendorRow): void {
+  if (!isApprovedVendor(vendor)) {
+    throw forbidden("Your store is not approved to manage products.");
+  }
+}
+
+/**
+ * Product writes require both a vendor role and an approved linked store.
+ *
+ * This is deliberately separate from requireVendor(): a pending seller may be
+ * allowed to view their onboarding/dashboard state, but cannot publish, alter,
+ * or archive marketplace inventory before approval.
+ */
+export async function requireApprovedVendor(): Promise<{ user: SessionUser; vendor: VendorRow }> {
+  const scope = await requireVendor();
+  assertApprovedVendor(scope.vendor);
+  return scope;
+}
+
 /**
  * Loads a product and proves the caller's store owns it.
  *

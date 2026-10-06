@@ -57,7 +57,7 @@ export type SessionRow = {
   createdAt: string;
 };
 
-export type VendorStatus = "Verified" | "Pending Verification" | "Rejected";
+export type VendorStatus = "Verified" | "Pending Verification" | "Rejected" | "Suspended";
 
 export type VendorRow = {
   id: string;

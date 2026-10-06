@@ -128,6 +128,44 @@ export const toProductDto = (p: ProductRow): ProductDto => ({
   vendorId: p.vendorId,
 });
 
+/**
+ * Public catalogue shape. Intentionally omits vendorId, vendor account data,
+ * SKU, internal lifecycle status, and exact inventory. A shopper needs to know
+ * whether an item can be bought, not how many units a seller holds or which
+ * account owns the listing.
+ */
+export type PublicProductDto = {
+  id: string;
+  name: string;
+  category: string;
+  brand: string;
+  pricePaise: number;
+  originalPricePaise: number | null;
+  inStock: boolean;
+  rating: number;
+  reviews: number;
+  description: string;
+  specs: Record<string, string>;
+  createdAt: string;
+  vendor: { name: string; city: string; verified: true };
+};
+
+export const toPublicProductDto = (p: ProductRow, v: VendorRow): PublicProductDto => ({
+  id: p.id,
+  name: p.name,
+  category: p.category,
+  brand: p.brand,
+  pricePaise: p.pricePaise,
+  originalPricePaise: p.originalPricePaise,
+  inStock: p.stock > 0,
+  rating: p.rating,
+  reviews: p.reviews,
+  description: p.description,
+  specs: { ...p.specs },
+  createdAt: p.createdAt,
+  vendor: { name: v.name, city: v.city, verified: true },
+});
+
 export type VendorDto = {
   id: string;
   name: string;
