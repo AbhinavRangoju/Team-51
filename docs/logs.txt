@@ -5337,3 +5337,293 @@ Actions Taken:
 * Ran typecheck and production build; verified emitted vendor-registration handlers
 * Restored irrelevant generated route-tree churn
 * Did not push
+
+================================================================================
+[2026-10-06T14:18:23+05:30] Read-only audit of backend after merging origin/main
+================================================================================
+User Prompt (verbatim):
+I have just merged the latest origin/main into my backend branch.
+
+Do NOT modify any files yet.
+
+Audit the merged result.
+
+My backend branch contains my completed:
+
+- Authentication and session security
+
+- Product APIs
+
+- Persistent cart APIs
+
+- Address APIs
+
+- Vendor registration/profile APIs
+
+The latest main contains teammate work, including database and deployment changes.
+
+Check:
+
+1. Whether my backend APIs still compile and work with the teammate's database changes.
+
+2. Whether db.ts, server.ts, guards.ts, dto.ts and persistence code have compatible assumptions.
+
+3. Whether any of my backend functionality was accidentally overwritten during the merge.
+
+4. Whether the teammate's database and deployment work is intact.
+
+5. Run the backend/security tests.
+
+6. Run the production build.
+
+7. Check git diff/history to identify any suspicious overwrites or regressions.
+
+8. Report exactly what is working, what is broken, and what needs fixing.
+
+Do NOT modify code.
+
+Do NOT commit anything.
+
+Only audit and report the results.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Read-only audit; no files changed and nothing committed in that turn. This
+entry is recorded late, in the following turn, because that turn's prompt
+forbade any file modification while AGENTS.md makes logging mandatory.
+
+Findings:
+* The merged backend branch (bff83d34 = 8e804f56 checkpoint + origin/main
+  55b440da) did NOT contain the Product, Cart, Address or Vendor
+  registration/profile APIs. Nothing overwrote them: they existed only on the
+  separate post-hack/backend-product-apis branch (Team-51-posthack worktree),
+  which had never been merged. None of its commits (6b94b00, 51525bd, 4f7b961,
+  f7c0f6b, 67f46a0) was an ancestor of backend. The merged build emitted 12
+  server functions (the frozen surface) versus 31 on the post-hack branch.
+* No teammate database or deployment work exists on the remote. Searched
+  origin/main, the newer remote main 5b9cb022, Frontend and Security: no DB
+  driver dependency, no migrations/.sql, no Docker/compose, no platform config,
+  no CI workflows; deployment/ unchanged since the frozen SHA; db.ts
+  byte-identical to the frozen version.
+* origin/main brought onboarding UI and route, an AuthPanel post-login redirect
+  to /onboarding (not an authority change), Hubby/Gemini error handling, a new
+  BOM-tolerant src/lib/server/env.ts, docs, styles and .env.example comments.
+  All frozen backend modules were unchanged.
+* Merged backend verification: 26/26 tests, no new type errors (only the 11
+  known chart.tsx/calendar.tsx errors), build exit 0, HTTP harness 110/0,
+  10 routes 200.
+* Regression found: docs/logs.txt lost five entries. The merge dropped the
+  11:08:15, 11:14:58, 11:19:04 and 11:23:39 entries; checkpoint 8e804f56
+  deleted the 11:28:30 entry. They remain recoverable from 06392ed and 21a0c69.
+* Read-only merge simulation of post-hack into backend: only docs/logs.txt
+  conflicts; all source merges cleanly.
+* Risk noted: post-hack code uses the JSON store's in-memory maps directly, so
+  a future Postgres db.ts will require porting it.
+
+Agent Response Summary:
+Audited the merged backend read-only. The frozen backend survived intact and
+verified clean, the post-hack APIs had simply never been merged, and no
+teammate database or deployment work exists on the remote yet. One real
+regression: five log entries lost to the merge and the checkpoint commit.
+
+Commit SHA:
+bff83d347aebe4559e4dbc4898b04af090d59e57 (audited state; no commit in that turn)
+
+Files Modified / Created:
+* None in that turn (this late entry: docs/logs.txt, Modified)
+
+Actions Taken:
+* git worktree/log/merge-base/ancestry inspection on both worktrees
+* git ls-remote and tree searches across origin branches for DB/deploy work
+* Diffed teammate source changes (AuthPanel, env.ts, hubby) for security impact
+* Header-level comparison of docs/logs.txt before and after the merge
+* git merge-tree --write-tree simulation of post-hack into backend
+* Ran vitest, tsc, build, HTTP harness and route smoke on the merged build
+* Snapshot/restored src/routeTree.gen.ts after build; left both worktrees clean
+
+================================================================================
+[2026-10-06T14:52:30+05:30] Merge post-hack backend APIs into backend
+================================================================================
+User Prompt (verbatim):
+Proceed with merging the completed post-hack backend branch into backend.
+
+Source branch:
+
+post-hack/backend-product-apis
+
+Target branch:
+
+backend
+
+Important:
+
+- Do NOT modify the teammate's database/deployment work because it is not on the remote yet.
+
+- Preserve all existing backend functionality on backend.
+
+- Preserve the completed Product, Cart, Address, and Vendor Registration/Profile APIs.
+
+- Do NOT modify frontend code.
+
+- Do NOT port anything to PostgreSQL yet.
+
+- Do NOT change checkout, authentication, or security behavior.
+
+Before merging:
+
+1. Create/verify a clean safety point for the current backend branch.
+
+2. Merge post-hack/backend-product-apis into backend.
+
+3. Resolve the expected docs/logs.txt conflict by preserving the append-only history from both branches where possible.
+
+4. Do not discard source-code changes from either side.
+
+5. Run:
+
+   - all backend/security tests
+
+   - production build
+
+   - HTTP security harness
+
+   - server-function verification
+
+6. Verify that Product, Cart, Address, and Vendor Registration/Profile APIs are present in the resulting production bundle.
+
+7. Check git diff and git status.
+
+8. Do not push to origin.
+
+Report:
+
+- merge commit SHA
+
+- conflicts encountered
+
+- tests
+
+- build
+
+- HTTP harness
+
+- server function count
+
+- any regressions
+
+- final working-tree status
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Merged post-hack/backend-product-apis (67f46a00) into backend (bff83d34) as
+merge commit 21a53787148f7a22cebdffaf93b477f2ff0ef7d4. Not pushed.
+
+Safety point: created local branch backup/backend-pre-posthack-merge at
+bff83d34 after confirming both worktrees clean and no merge in progress. Merge
+base was ae2fb5c (the frozen SHA).
+
+Conflicts: exactly one, docs/logs.txt, as predicted. Resolved as an
+append-only union by a helper that verified the post-hack side was a pure
+append of the merge base before using it: result = backend log unchanged (62
+entry headers) + the four post-hack phase entries (12:14:00, 12:29:30,
+13:02:40, 13:56:30) = 66 headers, every header from both sides present, no
+conflict markers. The five entries lost earlier (11:08:15, 11:14:58, 11:19:04,
+11:23:39, 11:28:30) were not part of this conflict and were not restored; they
+remain outstanding.
+
+Source integrity, verified on the staged merge before committing:
+* All post-hack paths (src/lib/api, db.ts, dto.ts, guards.ts, validate.ts,
+  addresses.ts, vendor-applications.ts, server.ts, src/test,
+  vitest.server.config.ts) identical to the post-hack branch.
+* All backend-side paths identical to backend HEAD: auth, session, password,
+  checkout, orders, vendor, pricing, ratelimit, seed, store, start, frontend
+  routes/components, hubby, onboarding, env.ts, styles, routeTree, .env.example,
+  deployment, package files, configs, scripts.
+* Only three lines removed from shared modules, each a type/import widening:
+  the VendorStatus union (adds Suspended) and two import lists.
+
+Verification (merged tree, before commit):
+* Default vitest config: 6 files, 65/65 passed.
+* Node server config: 5 files, 64/64 passed.
+* Typecheck: only the 11 known chart.tsx/calendar.tsx errors.
+* Production build: exit 0, server bundle 26,016 bytes, 70 client assets.
+* Server functions: 31 (12 frozen + 19 new), every expected handler present by
+  name and file, none unexpected: products 6, cart 4, addresses 5,
+  vendor-registration 4, plus auth 4, checkout 2, orders 3, vendor 2, hubby 1.
+* HTTP security harness scripts/e2e.mjs on a fresh production server, scoped to
+  the 12 frozen handlers it was written for: 110 PASS / 0 FAIL.
+* Ad-hoc HTTP smoke of the 19 new endpoints on a separate fresh production
+  server (temporary script outside the repo, not committed): 49 PASS / 0 FAIL,
+  covering public product DTO hiding, filters, unknown-field rejection, CSRF
+  default-deny on new endpoints, vendor ownership and cross-vendor not-found,
+  server-set stock, archive visibility, cart pricing/injection/isolation,
+  address IDOR and single-default, application Pending/duplicate/
+  self-approval/role-not-escalated, and vendor profile scoping.
+* Route smoke: 11 routes 200 with no error pages.
+* src/routeTree.gen.ts regenerated by build with line-ending-only change;
+  restored.
+
+Regressions: none detected.
+
+Agent Response Summary:
+Merged the post-hack backend APIs into backend with one append-only log
+conflict, preserving every source change from both sides and leaving checkout,
+authentication, frontend and deployment files untouched. All suites, the build,
+the 110-check harness and a 49-check HTTP smoke of the new APIs pass, with 31
+server functions emitted. Merge commit 21a53787; not pushed.
+
+Commit SHA:
+21a53787148f7a22cebdffaf93b477f2ff0ef7d4 (merge commit)
+
+Files Modified / Created:
+* src/lib/api/addresses.ts (Created — via merge)
+* src/lib/api/cart.ts (Created — via merge)
+* src/lib/api/products.ts (Created — via merge)
+* src/lib/api/vendor-registration.ts (Created — via merge)
+* src/lib/server/addresses.ts (Created — via merge)
+* src/lib/server/vendor-applications.ts (Created — via merge)
+* src/lib/server/db.ts (Modified — via merge)
+* src/lib/server/dto.ts (Modified — via merge)
+* src/lib/server/guards.ts (Modified — via merge)
+* src/lib/server/validate.ts (Modified — via merge)
+* src/server.ts (Modified — via merge)
+* src/test/addresses.test.ts (Created — via merge)
+* src/test/cart.test.ts (Created — via merge)
+* src/test/products.test.ts (Created — via merge)
+* src/test/vendor-registration.test.ts (Created — via merge)
+* vitest.server.config.ts (Created — via merge)
+* docs/logs.txt (Modified — conflict resolution and these entries)
+
+Actions Taken:
+* Created branch backup/backend-pre-posthack-merge at bff83d34
+* git merge --no-ff --no-commit post-hack/backend-product-apis
+* Resolved docs/logs.txt with a verified append-only union helper
+* Verified merged composition against both parents and scanned for markers
+* Ran default and Node vitest suites, tsc, production build
+* Mapped all 31 bundled server functions by name and file
+* Ran scripts/e2e.mjs on the frozen surface and an HTTP smoke on new endpoints
+* Committed the merge; did not push
