@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BadgeCheck, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/mh/StoreLayout";
 import { EmptyState } from "@/components/mh/ui";
 import { Button } from "@/components/ui/button";
+import { getQuote, type QuoteDto } from "@/lib/api/checkout";
 import { getProduct, getVendor, inr, vendors } from "@/lib/data";
+import { inrPaise } from "@/lib/money";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/cart")({
@@ -19,41 +22,84 @@ export const Route = createFileRoute("/cart")({
   component: CartPage,
 });
 
-export function useCartTotals() {
+/**
+ * The cart's line items, resolved against the static catalogue for name, image
+ * and vendor. Display only — no totals are derived here any more.
+ */
+function useCartLines() {
   const { cart } = useStore();
-  const lines = cart.filter((l) => !l.saved).map((l) => ({ ...l, product: getProduct(l.productId)! })).filter((l) => l.product);
-  const mrp = lines.reduce((s, l) => s + (l.product.originalPrice ?? l.product.price) * l.qty, 0);
-  const subtotal = lines.reduce((s, l) => s + l.product.price * l.qty, 0);
-  const discount = mrp - subtotal;
-  const delivery = subtotal === 0 || subtotal >= 999 ? 0 : 79;
-  const tax = Math.round(subtotal * 0.05);
-  return { lines, mrp, subtotal, discount, delivery, tax, total: subtotal + delivery + tax };
+  return cart
+    .filter((l) => !l.saved)
+    .map((l) => ({ ...l, product: getProduct(l.productId)! }))
+    .filter((l) => l.product);
 }
 
-export function SummaryRows({ t }: { t: ReturnType<typeof useCartTotals> }) {
+/**
+ * Asks the server to price the cart.
+ *
+ * This used to be `useCartTotals`, which summed MRP, applied the delivery
+ * threshold and computed 5% GST in the browser — and checkout then submitted
+ * the result as the amount to charge. Pricing now has exactly one
+ * implementation, in src/lib/server/pricing.ts, so what is shown here and what
+ * is charged at checkout cannot disagree.
+ */
+export function useServerQuote() {
+  const { cart } = useStore();
+  const [quote, setQuote] = useState<QuoteDto | null>(null);
+
+  const items = useMemo(
+    () => cart.filter((l) => !l.saved).map((l) => ({ productId: l.productId, qty: l.qty })),
+    [cart],
+  );
+
+  const load = useCallback(async () => {
+    if (!items.length) {
+      setQuote(null);
+      return;
+    }
+    try {
+      setQuote(await getQuote({ data: { items, speed: "std" } }));
+    } catch {
+      // Keep whatever was last shown. Checkout re-prices regardless, so a
+      // stale summary cannot lead to an incorrect charge.
+    }
+  }, [items]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return quote;
+}
+
+export function SummaryRows({ q }: { q: QuoteDto | null }) {
   const row = "flex justify-between text-sm";
+  if (!q) {
+    return <div className="space-y-3 text-sm text-muted-foreground" aria-busy="true">Working out your total…</div>;
+  }
   return (
     <div className="space-y-3">
-      <div className={row}><span className="text-muted-foreground">Subtotal (MRP)</span><span>{inr(t.mrp)}</span></div>
-      <div className={row}><span className="text-muted-foreground">Discounts</span><span className="text-success">−{inr(t.discount)}</span></div>
-      <div className={row}><span className="text-muted-foreground">Delivery</span><span>{t.delivery === 0 ? "Free" : inr(t.delivery)}</span></div>
-      <div className={row}><span className="text-muted-foreground">GST (5%)</span><span>{inr(t.tax)}</span></div>
-      <div className="flex justify-between border-t border-border pt-4 font-display text-lg font-semibold"><span>Total</span><span>{inr(t.total)}</span></div>
+      <div className={row}><span className="text-muted-foreground">Subtotal (MRP)</span><span>{inrPaise(q.mrpPaise)}</span></div>
+      <div className={row}><span className="text-muted-foreground">Discounts</span><span className="text-success">−{inrPaise(q.discountPaise)}</span></div>
+      <div className={row}><span className="text-muted-foreground">Delivery</span><span>{q.deliveryPaise === 0 ? "Free" : inrPaise(q.deliveryPaise)}</span></div>
+      <div className={row}><span className="text-muted-foreground">GST (5%)</span><span>{inrPaise(q.taxPaise)}</span></div>
+      <div className="flex justify-between border-t border-border pt-4 font-display text-lg font-semibold"><span>Total</span><span>{inrPaise(q.totalPaise)}</span></div>
     </div>
   );
 }
 
 function CartPage() {
   const { cart, setQty, removeFromCart, toggleSaved } = useStore();
-  const t = useCartTotals();
+  const lines = useCartLines();
+  const quote = useServerQuote();
   const saved = cart.filter((l) => l.saved);
-  const groups = vendors.map((v) => ({ vendor: v, lines: t.lines.filter((l) => l.product.vendorId === v.id) })).filter((g) => g.lines.length);
+  const groups = vendors.map((v) => ({ vendor: v, lines: lines.filter((l) => l.product.vendorId === v.id) })).filter((g) => g.lines.length);
 
   return (
     <StoreLayout>
       <div className="container-mh pt-10">
         <h1 className="text-3xl font-semibold md:text-4xl">Your cart</h1>
-        {t.lines.length === 0 ? (
+        {lines.length === 0 ? (
           <div className="mt-8">
             <EmptyState icon={<ShoppingBag />} title="Your cart is empty" body="Looks like you haven't added anything yet. Explore thousands of products from verified sellers." action={<Button asChild variant="brand" size="lg"><Link to="/shop">Start shopping</Link></Button>} />
           </div>
@@ -108,7 +154,7 @@ function CartPage() {
             </div>
             <aside className="card-mh h-fit p-6 lg:sticky lg:top-28">
               <h3 className="mb-5 text-lg font-semibold">Order summary</h3>
-              <SummaryRows t={t} />
+              <SummaryRows q={quote} />
               <Button asChild variant="brand" size="lg" className="mt-6 w-full"><Link to="/checkout">Proceed to Checkout</Link></Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">{groups.length} seller{groups.length > 1 ? "s" : ""} · protected by MarketHub Buyer Guarantee</p>
             </aside>

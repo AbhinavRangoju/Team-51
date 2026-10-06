@@ -13,6 +13,10 @@ dist/
 .env.*
 !.env.example
 
+# Server data store. Holds scrypt password hashes and live session ids, so
+# committing it would publish credentials and hand over valid sessions.
+data/
+
 # Logs
 npm-debug.log*
 yarn-error.log*

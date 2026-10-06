@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { EmptyState, StatusBadge } from "@/components/mh/ui";
 import { RequireAuth } from "@/components/mh/RequireAuth";
 import { Button } from "@/components/ui/button";
+import { cancelOrder } from "@/lib/api/orders";
 import { getProduct, inr, orderFlow, type Order, type OrderStatus } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -211,30 +212,31 @@ function OrdersPage() {
 function OrdersContent() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { orders: allOrders, updateOrder, user } = useStore();
+  const { orders, refreshOrders } = useStore();
   const filter = search.filter ?? "All";
 
   /**
-   * Only the signed-in shopper's own orders are listed.
-   *
-   * Worth being precise about what this is: the order list is a single
-   * localStorage array in the visitor's own browser, so this filter is a
-   * correctness and privacy-hygiene measure, not an authorization boundary —
-   * there is no server withholding anything. It matters because the seeded
-   * orders belong to a named shopper, and showing them to every visitor who
-   * signs up would be leaking one customer's purchase history to another.
-   * The real check belongs on whichever API eventually serves orders.
+   * `orders` now arrives from `listMyOrders`, which filters by the session's
+   * user id server-side. The previous client-side filter compared the order's
+   * customer name to the session name; that is both redundant now and wrong,
+   * because the shipping name is free text a shopper can set to anything at
+   * checkout. Authorization is no longer this component's job.
    */
-  const orders = useMemo(
-    () => allOrders.filter((o) => o.customer.trim().toLowerCase() === (user?.name ?? "").trim().toLowerCase()),
-    [allOrders, user?.name],
-  );
-
   const visible = useMemo(() => orders.filter((o) => matchesFilter(o, filter)), [orders, filter]);
 
-  const cancel = (id: string) => {
-    updateOrder(id, { status: "Cancelled", payment: "Refunded", eta: "—" });
-    toast.success("Order cancelled", { description: `${id} has been cancelled and refunded.` });
+  const cancel = async (id: string) => {
+    try {
+      // The server decides whether this order is still cancellable, restores
+      // the stock and sets the refund state. The request only names the order.
+      await cancelOrder({ data: { orderId: id } });
+      await refreshOrders();
+      toast.success("Order cancelled", { description: `${id} has been cancelled.` });
+    } catch (error) {
+      const raw = error instanceof Error ? error.message.trim() : "";
+      toast.error("Could not cancel", {
+        description: raw && raw.length <= 200 ? raw : "Please try again.",
+      });
+    }
   };
 
   const counts = {

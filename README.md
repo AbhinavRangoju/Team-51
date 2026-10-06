@@ -1,10 +1,183 @@
-# Build Secure 24 — Participant Starter Repository
+# MarketHub — Secure Multi-Vendor Marketplace
 
-**Abhedya — VBIT Cybersecurity Forum, Vignana Bharathi Institute of Technology, Hyderabad**
+**Team 51 (Trishul) · Build Secure 24 · Abhedya — VBIT Cybersecurity Forum**
 
-Welcome to the official Build Secure 24 starter repository.
+A multi-vendor marketplace where shoppers, independent sellers and operators share
+one dataset. Because those parties do not trust each other, the design problem is
+**authorization**, not authentication: the server owns identity, roles, prices,
+stock, ownership and order state, and the browser is treated as an untrusted
+renderer with no authority.
+
+Architecture, threat model and decision records: [`docs/APPROACH.md`](docs/APPROACH.md).
 
 ---
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js 22.12 or newer.** `@tanstack/start-server-core` requires it. The app
+  does run on Node 20, but that is outside the supported range and npm will warn.
+- npm 10+
+
+### Install and run
+
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
+
+### Verify
+
+```bash
+npm run typecheck    # expect 2 pre-existing failures, see "Known issues"
+npm test             # 25 security tests + 1 routing test
+npm run build        # emits .output/
+npm start            # serves the production build (honours PORT)
+```
+
+### End-to-end security harness
+
+`npm test` covers the server logic directly. The harness additionally drives the
+real HTTP endpoints — session cookie, CSRF, serialisation — against a running
+server. It needs the generated server-function ids, which change on each build.
+
+```bash
+npm run build
+npm start                                    # in one terminal, note the port
+
+# in another terminal
+npm run serverfn:ids                         # copy the comma-separated last line
+$env:MH_FN_IDS="<ids>"                       # PowerShell
+export MH_FN_IDS="<ids>"                     # bash
+npm run test:e2e -- http://localhost:3000
+```
+
+Run it against a **freshly started** server. The suite intentionally exhausts the
+login rate-limit bucket at the end, so a second run on the same process will
+report that limiter instead of the checks it is meant to make.
+
+Expected: `PASS 110   FAIL 0`.
+
+---
+
+## Environment Variables
+
+All are optional. Copy [`.env.example`](.env.example) to `.env` to set them.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MH_DATA_FILE` | `./data/markethub.json` | Where the server store is written. **Point this at a persistent volume in production** — see Deployment. |
+| `MH_SEED_PASSWORD` | `Demo@1234` | Password for the fictional seeded demo accounts. |
+| `MH_ADMIN_PASSWORD` | *(unset)* | **No default by design.** An admin account is created only if this is set, so a deployment never ships a privileged account with a guessable password. |
+| `GEMINI_API_KEY` | *(unset)* | Optional, for the Hubby assistant. Without it Hubby falls back to offline keyword matching. |
+| `GEMINI_MODEL` | *(built-in)* | Optional model override. |
+
+`NODE_ENV` does **not** need to be set for cookie security: Vite inlines
+`process.env.NODE_ENV` as `"production"` when building, so the built server always
+sets the `Secure` flag. This was verified directly against the production bundle.
+
+---
+
+## Demo Accounts
+
+Seeded accounts are fictional sample data from `src/lib/data.ts`. All use
+`MH_SEED_PASSWORD` (default `Demo@1234`).
+
+| Role | Email | Sees |
+|---|---|---|
+| Shopper | `priya@mail.com` | Her own order history only |
+| Seller | `arjun@nordicsound.in` | Nordic Sound Co. (`v1`) only |
+| Seller | `neha@stride.in` | Stride Athletics (`v2`) only |
+
+Signing in as a seller shows **only that seller's** listings and only the order
+lines they are fulfilling. Shopper street addresses, phone numbers and other
+sellers' revenue are never sent to a seller. Both properties are covered by tests.
+
+Deliberate note on these credentials: the demo password is public so evaluators
+can sign in, and that is an accepted trade-off because every seeded account holds
+fictional data and each one is confined to its own slice by the same
+authorization checks that protect a real account. The **admin** role is handled
+differently and has no default password at all.
+
+---
+
+## Project Layout
+
+```
+src/
+├── lib/
+│   ├── server/        ← server-only; never reaches the browser
+│   │   ├── db.ts          tables, unique indexes, atomic persistence, tx()
+│   │   ├── pricing.ts     the single source of money truth (integer paise)
+│   │   ├── password.ts    scrypt hashing, constant-time compare
+│   │   ├── session.ts     opaque session ids, httpOnly cookie
+│   │   ├── guards.ts      requireUser / requireRole / ownership checks
+│   │   ├── dto.ts         explicit field-by-field serialisation
+│   │   ├── validate.ts    allow-list validators + error boundary
+│   │   ├── ratelimit.ts   fixed-window per-IP buckets
+│   │   └── seed.ts        one-time catalogue import
+│   ├── api/           ← server functions (the only trust boundary)
+│   │   ├── auth.ts        signup / login / logout / me
+│   │   ├── checkout.ts    getQuote / placeOrder
+│   │   ├── orders.ts      listMyOrders / getMyOrder / cancelOrder
+│   │   └── vendor.ts      getVendorDashboard / advanceVendorOrder
+│   ├── data.ts        ← public catalogue + imagery (client-side by design)
+│   └── store.tsx      ← client state; cart/wishlist only, zero authority
+├── routes/            ← 18 pages
+└── test/              ← security test suite
+
+scripts/               ← verification tooling, not application code
+```
+
+`src/lib/server/*` is only ever reached through `await import()` inside a handler
+body, which keeps it and any secrets out of the client bundle.
+
+---
+
+## Deployment
+
+```bash
+npm ci
+npm run build
+npm start            # listens on $PORT, default 3000
+```
+
+Three things to get right:
+
+1. **Use Node 22.12+.** Declared in `engines`.
+2. **Set `MH_DATA_FILE` to a path on a persistent volume.** The store is a JSON
+   file. On a platform with an ephemeral filesystem (Render, Railway, Fly without
+   a volume, most container hosts) the default path lives inside the deployed
+   bundle and **every account and order is lost on restart or redeploy**. This is
+   the single most important deployment setting.
+3. **Leave `MH_ADMIN_PASSWORD` unset** unless an admin account is actually wanted.
+
+There is no dedicated `/health` endpoint; `/` returns 200 and serves as the health
+check. Record the live URL in [`deployment/README.md`](deployment/README.md) and
+[`metadata/submission.yaml`](metadata/submission.yaml).
+
+---
+
+## Known Issues
+
+- `npm run typecheck` reports **2 pre-existing failures** in
+  `src/components/ui/chart.tsx` and `src/components/ui/calendar.tsx`. These are
+  stale shadcn wrappers versus the installed `recharts` / `react-day-picker`
+  majors. Neither file is imported by any route. Everything else is clean.
+- The JSON store is correct on a single process but **does not survive horizontal
+  scaling** — two instances would each hold their own copy. See ADR-001 in
+  `docs/APPROACH.md`.
+- Browse pages read stock from the static catalogue, so a product's stock number
+  can look stale after a purchase. Checkout re-prices and re-checks stock
+  server-side, so the worst case is a corrected message at checkout, never an
+  oversell.
+
+---
+
+# Build Secure 24 — Competition Reference
+
+**Abhedya — VBIT Cybersecurity Forum, Vignana Bharathi Institute of Technology, Hyderabad**
 
 ## 1. Challenge Overview
 
