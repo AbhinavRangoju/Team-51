@@ -2483,3 +2483,45 @@ Actions Taken:
 * Deleted 3 throwaway investigation scripts and all scratch output files
 * Re-ran typecheck, vitest, build and the harness after every change
 * Did NOT push and did NOT fill commit_sha, per instruction
+
+--------------------------------------------------------------------------------
+[2026-10-06T10:36:20+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+0cfe108
+
+Commit Message:
+test(e2e): add 110-check HTTP security harness; fix prod config and docs
+
+Branch:
+backend
+
+Files in commit:
+* scripts/e2e.mjs (Created)
+* scripts/seroval-lite.mjs (Created)
+* scripts/find-serverfn-ids.mjs (Created)
+* scripts/cookie-check.mjs (Created)
+* README.md (Modified)
+* deployment/README.md (Modified)
+* docs/APPROACH.md (Modified)
+* .env.example (Modified)
+* package.json (Modified)
+* package-lock.json (Modified)
+* docs/logs.txt (Modified)
+
+Push:
+NOT pushed, per explicit instruction. When cleared:
+  git push origin backend
+
+Verification state at this commit:
+* npx tsc --noEmit        zero errors outside 2 known-stale shadcn wrappers
+* npx vitest --run        26/26 passing
+* npm run build           clean, .output/server/index.mjs 24.2 KB + 65 assets
+* scripts/e2e.mjs         110 pass / 0 fail against the production bundle
+
+Still outstanding before the freeze:
+* Deploy. Nothing is live yet.
+* metadata/submission.yaml: commit_sha, deployment_url, submitted_at all empty.
+* deployment/README.md: live URL, platform and the Deployment Record row.
+* On deploy, MH_DATA_FILE MUST point at a persistent volume or all accounts and
+  orders are lost on restart. Highest-impact deployment setting.
