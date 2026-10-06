@@ -13,7 +13,7 @@
  * `requireVendor` below throws instead. There is no fallback path.
  */
 
-import { db, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
+import { cartItemKey, db, type AddressRow, type CartItemRow, type OrderRow, type ProductRow, type Role, type VendorRow } from "./db";
 import { requireSessionUser, type SessionUser } from "./session";
 import { forbidden, notFound } from "./validate";
 
@@ -41,6 +41,62 @@ export async function requireVendor(): Promise<{ user: SessionUser; vendor: Vend
     throw forbidden("Your seller account is not linked to a store yet.");
   }
   return { user, vendor };
+}
+
+/** A store is sellable/manageable only after server-side verification. */
+export function isApprovedVendor(vendor: VendorRow): boolean {
+  return vendor.status === "Verified" && vendor.verified === true;
+}
+
+/** Pure approval assertion: shared by the authenticated guard and direct tests. */
+export function assertApprovedVendor(vendor: VendorRow): void {
+  if (!isApprovedVendor(vendor)) {
+    throw forbidden("Your store is not approved to manage products.");
+  }
+}
+
+/**
+ * A cart may contain only products that a customer could buy right now.
+ * Stock is deliberately not reserved here; checkout remains the final,
+ * transaction-protected stock authority.
+ */
+export function isSellableProduct(product: ProductRow | undefined, vendor: VendorRow | undefined): boolean {
+  return Boolean(product && vendor && product.status === "Active" && isApprovedVendor(vendor));
+}
+
+/** Cart writes require current stock, but do not reserve it. Checkout re-checks atomically. */
+export function isPurchasableProduct(product: ProductRow | undefined, vendor: VendorRow | undefined): boolean {
+  return Boolean(isSellableProduct(product, vendor) && product && product.stock > 0);
+}
+
+/**
+ * Loads a cart line through the authenticated user's own composite key.
+ * Returning not-found for another user's product id prevents cart enumeration.
+ */
+export function requireOwnCartItem(userId: string, productId: string): CartItemRow {
+  const item = db().t.cartItems.get(cartItemKey(userId, productId));
+  if (!item) throw notFound("Cart item not found.");
+  return item;
+}
+
+/** Address IDs are random, but ownership remains mandatory; obscurity is not authorization. */
+export function requireOwnAddress(userId: string, addressId: string): AddressRow {
+  const address = db().t.addresses.get(addressId);
+  if (!address || address.userId !== userId) throw notFound("Address not found.");
+  return address;
+}
+
+/**
+ * Product writes require both a vendor role and an approved linked store.
+ *
+ * This is deliberately separate from requireVendor(): a pending seller may be
+ * allowed to view their onboarding/dashboard state, but cannot publish, alter,
+ * or archive marketplace inventory before approval.
+ */
+export async function requireApprovedVendor(): Promise<{ user: SessionUser; vendor: VendorRow }> {
+  const scope = await requireVendor();
+  assertApprovedVendor(scope.vendor);
+  return scope;
 }
 
 /**

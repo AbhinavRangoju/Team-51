@@ -1,4 +1,11 @@
 import "./lib/error-capture";
+// Product, cart and address APIs are intentionally backend-only for now.
+// Register these modules from the server entry so their functions are emitted
+// before frontend integration chooses to consume them.
+import "./lib/api/products";
+import "./lib/api/cart";
+import "./lib/api/addresses";
+import "./lib/api/vendor-registration";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";

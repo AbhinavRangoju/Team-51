@@ -57,7 +57,7 @@ export type SessionRow = {
   createdAt: string;
 };
 
-export type VendorStatus = "Verified" | "Pending Verification" | "Rejected";
+export type VendorStatus = "Verified" | "Pending Verification" | "Rejected" | "Suspended";
 
 export type VendorRow = {
   id: string;
@@ -73,6 +73,52 @@ export type VendorRow = {
 };
 
 export type ProductStatus = "Active" | "Draft" | "Archived";
+
+export type VendorApplicationStatus = "Pending" | "Approved" | "Rejected";
+
+export type VendorApplicationRow = {
+  id: string;
+  /** Owner of the application. One application per user; never client supplied. */
+  userId: string;
+  storeName: string;
+  description: string;
+  category: string;
+  phone: string;
+  city: string;
+  /** Server-controlled lifecycle. A customer can never set or change this. */
+  status: VendorApplicationStatus;
+  /** Set only by an admin review (Phase 5). */
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CartItemRow = {
+  userId: string;
+  productId: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AddressRow = {
+  id: string;
+  userId: string;
+  label: string;
+  name: string;
+  phone: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: "IN";
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type ProductRow = {
   id: string;
@@ -145,6 +191,12 @@ type Tables = {
   sessions: Map<string, SessionRow>;
   vendors: Map<string, VendorRow>;
   products: Map<string, ProductRow>;
+  /** userId:productId -> cart line. User ownership is structural, not client supplied. */
+  cartItems: Map<string, CartItemRow>;
+  /** Random addressId -> address row. Every lookup also proves row.userId. */
+  addresses: Map<string, AddressRow>;
+  /** Random applicationId -> application. One per user, enforced on insert. */
+  vendorApplications: Map<string, VendorApplicationRow>;
   orders: Map<string, OrderRow>;
 };
 
@@ -178,6 +230,9 @@ function emptyDb(): Db {
       sessions: new Map(),
       vendors: new Map(),
       products: new Map(),
+      cartItems: new Map(),
+      addresses: new Map(),
+      vendorApplications: new Map(),
       orders: new Map(),
     },
     emailIndex: new Map(),
@@ -191,6 +246,9 @@ type Persisted = {
   sessions: SessionRow[];
   vendors: VendorRow[];
   products: ProductRow[];
+  cartItems: CartItemRow[];
+  addresses: AddressRow[];
+  vendorApplications: VendorApplicationRow[];
   orders: OrderRow[];
   seeded: boolean;
 };
@@ -203,6 +261,11 @@ function hydrate(db: Db, raw: Persisted): void {
   for (const s of raw.sessions ?? []) db.t.sessions.set(s.id, s);
   for (const v of raw.vendors ?? []) db.t.vendors.set(v.id, v);
   for (const p of raw.products ?? []) db.t.products.set(p.id, p);
+  for (const item of raw.cartItems ?? []) {
+    db.t.cartItems.set(cartItemKey(item.userId, item.productId), item);
+  }
+  for (const address of raw.addresses ?? []) db.t.addresses.set(address.id, address);
+  for (const app of raw.vendorApplications ?? []) db.t.vendorApplications.set(app.id, app);
   for (const o of raw.orders ?? []) {
     db.t.orders.set(o.id, o);
     db.idemIndex.set(o.idempotencyKey, o.id);
@@ -241,6 +304,9 @@ function snapshot(d: Db): Persisted {
     sessions: [...d.t.sessions.values()],
     vendors: [...d.t.vendors.values()],
     products: [...d.t.products.values()],
+    cartItems: [...d.t.cartItems.values()],
+    addresses: [...d.t.addresses.values()],
+    vendorApplications: [...d.t.vendorApplications.values()],
     orders: [...d.t.orders.values()],
     seeded: d.seeded,
   };
@@ -292,6 +358,9 @@ export function tx<T>(fn: () => T): T {
 }
 
 export const newId = (): string => randomUUID();
+
+/** Cartesian ownership key: neither userId nor productId arrives from a cart request unchecked. */
+export const cartItemKey = (userId: string, productId: string): string => `${userId}:${productId}`;
 
 /** Order ids are random, not sequential, so one order id never reveals another. */
 export function newOrderId(): string {

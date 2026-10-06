@@ -8,7 +8,15 @@
  * column is invisible to the client until someone adds it here on purpose.
  */
 
-import type { OrderRow, ProductRow, UserRow, VendorRow } from "./db";
+import type {
+  AddressRow,
+  CartItemRow,
+  OrderRow,
+  ProductRow,
+  UserRow,
+  VendorApplicationRow,
+  VendorRow,
+} from "./db";
 
 export type OrderDto = {
   id: string;
@@ -128,6 +136,110 @@ export const toProductDto = (p: ProductRow): ProductDto => ({
   vendorId: p.vendorId,
 });
 
+/**
+ * Public catalogue shape. Intentionally omits vendorId, vendor account data,
+ * SKU, internal lifecycle status, and exact inventory. A shopper needs to know
+ * whether an item can be bought, not how many units a seller holds or which
+ * account owns the listing.
+ */
+export type PublicProductDto = {
+  id: string;
+  name: string;
+  category: string;
+  brand: string;
+  pricePaise: number;
+  originalPricePaise: number | null;
+  inStock: boolean;
+  rating: number;
+  reviews: number;
+  description: string;
+  specs: Record<string, string>;
+  createdAt: string;
+  vendor: { name: string; city: string; verified: true };
+};
+
+export const toPublicProductDto = (p: ProductRow, v: VendorRow): PublicProductDto => ({
+  id: p.id,
+  name: p.name,
+  category: p.category,
+  brand: p.brand,
+  pricePaise: p.pricePaise,
+  originalPricePaise: p.originalPricePaise,
+  inStock: p.stock > 0,
+  rating: p.rating,
+  reviews: p.reviews,
+  description: p.description,
+  specs: { ...p.specs },
+  createdAt: p.createdAt,
+  vendor: { name: v.name, city: v.city, verified: true },
+});
+
+/** Cart DTOs use current server pricing and no account/vendor identifiers. */
+export type CartItemDto = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPricePaise: number | null;
+  linePaise: number | null;
+  available: boolean;
+  vendor: { name: string; city: string } | null;
+};
+
+export type CartDto = {
+  items: CartItemDto[];
+  distinctItems: number;
+  subtotalPaise: number;
+  hasUnavailableItems: boolean;
+};
+
+/**
+ * Current price only; cart lines never snapshot price or reserve stock. An
+ * unavailable historical line remains removable, but cannot be increased.
+ */
+export function toCartDto(
+  items: CartItemRow[],
+  products: Map<string, ProductRow>,
+  vendors: Map<string, VendorRow>,
+  isSellable: (product: ProductRow | undefined, vendor: VendorRow | undefined) => boolean,
+): CartDto {
+  let subtotalPaise = 0;
+  let hasUnavailableItems = false;
+
+  const lines = items
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((item) => {
+      const product = products.get(item.productId);
+      const vendor = product ? vendors.get(product.vendorId) : undefined;
+      const available = isSellable(product, vendor);
+      if (!product || !vendor || !available) {
+        hasUnavailableItems = true;
+        return {
+          productId: item.productId,
+          name: product?.name ?? "Unavailable product",
+          quantity: item.quantity,
+          unitPricePaise: null,
+          linePaise: null,
+          available: false,
+          vendor: vendor ? { name: vendor.name, city: vendor.city } : null,
+        };
+      }
+
+      const linePaise = product.pricePaise * item.quantity;
+      subtotalPaise += linePaise;
+      return {
+        productId: product.id,
+        name: product.name,
+        quantity: item.quantity,
+        unitPricePaise: product.pricePaise,
+        linePaise,
+        available: true,
+        vendor: { name: vendor.name, city: vendor.city },
+      };
+    });
+
+  return { items: lines, distinctItems: lines.length, subtotalPaise, hasUnavailableItems };
+}
+
 export type VendorDto = {
   id: string;
   name: string;
@@ -153,6 +265,66 @@ export const toVendorDto = (v: VendorRow): VendorDto => ({
   status: v.status,
   verified: v.verified,
   rating: v.rating,
+});
+
+export type VendorApplicationDto = {
+  id: string;
+  storeName: string;
+  description: string;
+  category: string;
+  phone: string;
+  city: string;
+  status: "Pending" | "Approved" | "Rejected";
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Applicant-facing view. Deliberately omits userId and reviewedByUserId: the
+ * applicant may see their own status and any rejection reason, but not which
+ * internal account reviewed it.
+ */
+export const toVendorApplicationDto = (a: VendorApplicationRow): VendorApplicationDto => ({
+  id: a.id,
+  storeName: a.storeName,
+  description: a.description,
+  category: a.category,
+  phone: a.phone,
+  city: a.city,
+  status: a.status,
+  rejectionReason: a.rejectionReason,
+  createdAt: a.createdAt,
+  updatedAt: a.updatedAt,
+});
+
+export type AddressDto = {
+  id: string;
+  label: string;
+  name: string;
+  phone: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: "IN";
+  isDefault: boolean;
+};
+
+/** Owner-facing PII, but never persistence ownership or internal timestamps. */
+export const toAddressDto = (address: AddressRow): AddressDto => ({
+  id: address.id,
+  label: address.label,
+  name: address.name,
+  phone: address.phone,
+  line1: address.line1,
+  line2: address.line2,
+  city: address.city,
+  state: address.state,
+  postalCode: address.postalCode,
+  country: address.country,
+  isDefault: address.isDefault,
 });
 
 export type AccountDto = {

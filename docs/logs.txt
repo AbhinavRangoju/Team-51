@@ -4802,3 +4802,538 @@ Actions Taken:
 * Deleted temporary files .mergetmp/, tc.log, test.log, build.log, .logentry.tmp
 * NO force push, NO reset, NO history rewrite, NO branch deletion
 * metadata/submission.yaml NOT touched
+
+================================================================================
+[2026-10-06T12:14:00+05:30] Post-hack Phase 1: product APIs
+================================================================================
+User Prompt (verbatim):
+I have 10 minutes.
+
+This is POST-HACKATHON work only. Do NOT modify the frozen submission SHA or hackathon branch.
+
+I am backend-only.
+
+Implement ONLY Phase 1 Product APIs from the plan:
+
+- Public product listing
+
+- Public product details
+
+- Search/filter/sort with strict validation
+
+- Vendor product listing
+
+- Vendor create product
+
+- Vendor update product
+
+- Vendor archive product
+
+- Strict vendor ownership checks
+
+- Only approved/verified vendors can modify products
+
+- Product DTOs must not expose sensitive user/vendor data
+
+- No client-controlled vendorId, ownerId, stock, rating, review count, or status
+
+- Archived/unverified products must not appear publicly
+
+Reuse the existing authentication, authorization, validation, DTO and error-handling patterns.
+
+Add only the essential tests for:
+
+- public access
+
+- vendor ownership
+
+- cross-vendor IDOR
+
+- unauthorized customer access
+
+- pending/suspended vendor rejection
+
+- mass-assignment attempts
+
+Do NOT touch frontend code.
+
+Do NOT add AI.
+
+Do NOT refactor unrelated code.
+
+Do NOT migrate the database.
+
+Do NOT spend time on documentation.
+
+Implement it now and then immediately report:
+
+- files changed
+
+- tests passed/failed
+
+- build status
+
+- what remains unfinished.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Created the isolated linked worktree
+C:\Users\Vivek\OneDrive\Desktop\Team-51-posthack on branch
+post-hack/backend-product-apis directly from frozen SHA ae2fb5c. The frozen
+submission checkout and hackathon branch were not modified. Existing node_modules
+were exposed to the worktree via an untracked junction only; no dependency was
+added.
+
+Implemented only Phase 1 product APIs:
+* src/lib/api/products.ts — public list/detail; validated public filters for q,
+  category, vendor ID, price bounds, integer rating, in-stock/sale toggles,
+  allowlisted sort and bounded paging; vendor list/create/update/archive.
+* Writes derive the vendor from the authenticated session. New requireApprovedVendor
+  enforces both vendor role/linkage and Verified status/verified flag. Pending,
+  rejected and suspended vendors cannot create/update/archive listings.
+* Cross-vendor product access uses requireOwnedProduct and returns not-found.
+* New strictObj validation helper rejects unknown/mass-assignment fields. Product
+  create/update reject vendorId, ownerId, stock, rating, reviews, status, SKU and
+  client IDs. New product stock is server-set to 0; inventory adjustment is
+  deliberately deferred to a dedicated future audited workflow.
+* Product IDs and SKUs are server-generated. Ratings/review counts/status are
+  server-owned. Archive sets Archived instead of deleting historical data.
+* Public products require Active status plus an approved/verified vendor. Public
+  DTO omits vendor user ID/email, product vendorId, exact stock, SKU and lifecycle
+  status; it returns only safe vendor name/city/verified data and boolean inStock.
+* src/server.ts imports the backend-only product module so TanStack emits all six
+  server functions without touching any frontend route/component. Production
+  output confirmed 18 function IDs (12 existing + 6 product functions) and a
+  products server chunk.
+* src/test/products.test.ts added nine focused tests: public visibility/DTO,
+  bounded filters, verified/pending/suspended vendor gating, cross-vendor IDOR,
+  strict create/update mass assignment and prototype-pollution-shaped spec keys.
+* vitest.server.config.ts runs server tests under Node. The linked worktree's
+  standard jsdom config externalizes node builtins through the node_modules
+  junction; this backend-specific config avoids that environment artifact.
+
+Caught and fixed one requirement conflict during implementation: initial product
+create/update accepted stock, which contradicts the prompt's no client-controlled
+stock rule. Stock was removed from both contracts; new products start at zero.
+
+Verification:
+* `npx vitest --run --config ./vitest.server.config.ts` with a fresh temporary
+  MH_DATA_FILE: 2 files, 34/34 tests passed (25 pre-existing backend tests + 9
+  product tests).
+* Production build: exit 0; .output/server/index.mjs produced.
+* Typecheck: no new errors. The only remaining typecheck errors are the two
+  pre-existing stale shadcn wrappers (calendar.tsx/chart.tsx).
+* git diff --check: clean.
+
+Agent Response Summary:
+Completed only the requested post-hack Product API phase in a separate worktree,
+with strict input contracts, verified vendor write gating, ownership controls,
+archive semantics and safe public DTOs. No frontend, AI, database migration,
+cart/address/vendor-registration/admin work or frozen-submission source changed.
+Phase 1 code commit is 6b94b0008cef0b5c0cf60354366baa6b1bcc9716.
+
+Commit SHA:
+6b94b0008cef0b5c0cf60354366baa6b1bcc9716 (post-hack Phase 1 code)
+
+Files Modified / Created:
+* src/lib/api/products.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/lib/server/validate.ts (Modified)
+* src/server.ts (Modified — server-only registration)
+* src/test/products.test.ts (Created)
+* vitest.server.config.ts (Created)
+* docs/logs.txt (Modified — post-hack branch log only)
+
+Actions Taken:
+* Created isolated linked worktree from frozen SHA ae2fb5c
+* Reused current auth, guard, validation, DTO, transaction and error patterns
+* Implemented six emitted product server functions
+* Ran product/backend Node test config using fresh temporary persistence
+* Built the production bundle and verified emitted product server functions
+* Kept no source changes in the original hackathon checkout
+* Did not push
+
+================================================================================
+[2026-10-06T12:29:30+05:30] Post-hack Phase 2: persistent cart APIs
+================================================================================
+User Prompt (verbatim):
+Phase 1 is approved.
+
+Continue with Phase 2 — Persistent Cart APIs.
+
+Backend only. Do not modify frontend code.
+
+Implement:
+
+- getMyCart
+
+- addCartItem
+
+- setCartItemQuantity
+
+- removeCartItem
+
+Requirements:
+
+- Authentication required
+
+- userId always comes from the session
+
+- Never accept userId, vendorId, price, stock or total from the client
+
+- Maximum 50 distinct cart items
+
+- Quantity 1–20
+
+- Product must be active and currently sellable
+
+- Use current server-side product pricing in responses
+
+- Do not reserve stock in the cart
+
+- Keep checkout as the final stock authority
+
+- Prevent cross-user cart access
+
+- Reject unknown/mass-assignment fields
+
+- Add security tests for ownership, validation and malicious input
+
+Reuse the existing patterns from products.ts, guards.ts, validate.ts and db.ts.
+
+Do not change checkout or existing authentication/security behavior.
+
+Implement, test, build, and report the result.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
+
+Agent Response:
+Implemented Phase 2 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, checkout, authentication, frozen
+submission source, database migration, AI or unrelated code was changed.
+
+Implementation:
+* Added CartItemRow and persistent cartItems Map to the JSON store, with
+  userId:productId composite keys, hydration and snapshot persistence.
+* Added getMyCart, addCartItem, setCartItemQuantity and removeCartItem in
+  src/lib/api/cart.ts. All derive userId solely from requireUser() session data.
+* New request contracts use strictObj() and accept only productId/quantity. They
+  reject userId, vendorId, pricePaise, stock, totalPaise, status and all unknown
+  fields. Quantity is validated 1–20.
+* addCartItem merges existing own lines but rejects a merged quantity above 20;
+  rejects a new distinct line after 50.
+* Added isPurchasableProduct: active product, verified/approved vendor and stock
+  above zero are required to add or increase a cart line. Cart stock is NEVER
+  decremented or reserved; checkout remains the final atomic stock authority and
+  was not edited.
+* getMyCart calculates line price and subtotal from current server product rows.
+  Cart does not store price, vendor or total. Unavailable existing lines remain
+  removable but return available:false and null price fields, preventing stale
+  client prices from becoming authoritative.
+* requireOwnCartItem returns not-found for a different user/product pair, which
+  prevents cross-user cart enumeration.
+* Added CartItemDto/CartDto with no userId, vendorId, vendor email or stock.
+* Registered cart APIs in the server entry. Production output contains 22 server
+  functions (18 prior + four cart handlers) and cart server chunk.
+
+Testing:
+* `npx vitest --run --config ./vitest.server.config.ts` with fresh temporary
+  MH_DATA_FILE: 3 files, 41/41 tests passed.
+* Added 7 cart-focused tests for ownership isolation, missing own row,
+  quantity bounds, mass assignment, active/verified/in-stock eligibility,
+  current server price DTOs and unavailable stale cart lines.
+* Typecheck reported no new errors; only the two pre-existing stale shadcn UI
+  wrapper errors remain outside Phase 2.
+* `npm run build`: exit 0 and server bundle present.
+
+Agent Response Summary:
+Completed Phase 2 persistent cart APIs in the separate post-hack branch. Cart
+ownership is session-derived, inputs are strict, current server prices are used
+in DTOs, stock is not reserved, and checkout/auth security behavior stays
+unchanged. Phase 2 source commit is 51525bdfdc080038c10c68f5ff41ab5e86754387.
+
+Commit SHA:
+51525bdfdc080038c10c68f5ff41ab5e86754387 (post-hack Phase 2 code)
+
+Files Modified / Created:
+* src/lib/api/cart.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/server.ts (Modified — server-only cart registration)
+* src/test/cart.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected Phase 1 product/persistence/DTO/guard contracts in isolated worktree
+* Added cart persistence, DTO mapping, guard helpers and four cart server functions
+* Tightened current sellability to require stock > 0 for cart writes without reservation
+* Added focused cart security tests
+* Ran isolated backend/product/cart tests with temporary data
+* Ran production build and verified emitted cart handlers
+* Restored irrelevant generated route-tree line-ending churn
+* Did not push
+
+================================================================================
+[2026-10-06T13:02:40+05:30] Post-hack Phase 3: address APIs
+================================================================================
+User Prompt (verbatim):
+Continue with Phase 3 — Address APIs.
+
+Backend only. Do not modify frontend code.
+
+Important:
+
+- Database and deployment are already handled by another teammate on another laptop.
+
+- Do NOT implement PostgreSQL migration or deployment work.
+
+- Reuse the existing database/data-layer abstractions.
+
+- Do not change checkout, authentication, or existing cart/product behavior.
+
+Implement:
+
+- getMyAddresses
+
+- createAddress
+
+- updateAddress
+
+- deleteAddress
+
+- setDefaultAddress
+
+Requirements:
+
+- Authentication required
+
+- userId must always come from the authenticated session
+
+- Never accept userId from the client
+
+- Strict input allow-list; reject unknown/mass-assignment fields
+
+- Maximum 10 saved addresses per user
+
+- Validate name, phone, address lines, city, state, postal/PIN code and country
+
+- User can only read/update/delete their own addresses
+
+- Prevent cross-user IDOR
+
+- Server-generated unpredictable address IDs
+
+- Default address must be user-scoped
+
+- Only one default address per user
+
+- Do not expose internal user/account fields
+
+- Add security tests for ownership, validation, IDOR and malicious input
+
+Implement, test, build, and report the result.
+
+Agent Response:
+Implemented Phase 3 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, checkout, authentication, cart,
+product, frozen submission source, database-migration or deployment work was
+changed. Reused the existing JSON data-layer abstractions as instructed.
+
+Implementation:
+* Added AddressRow and a persistent addresses Map to the store, with hydration
+  and snapshot persistence alongside the existing tables.
+* Added src/lib/server/addresses.ts: an internal user-scoped service with
+  listAddressRows, createAddressForUser, updateAddressForUser,
+  setDefaultAddressForUser and deleteAddressForUser. All default-address writes
+  run inside tx() and only touch rows owned by the given userId.
+* Added src/lib/api/addresses.ts: getMyAddresses, createAddress, updateAddress,
+  deleteAddress and setDefaultAddress. Each resolves userId via requireUser()
+  only; no endpoint accepts a userId.
+* requireOwnAddress returns not-found for a non-owner, so address IDs cannot be
+  enumerated across users. IDs are randomUUID (unpredictable); ownership, not
+  obscurity, is the IDOR boundary.
+* strictObj allow-list validation. Create/update reject userId, id, isDefault,
+  createdAt, updatedAt and all unknown fields. Fields validated: label, name,
+  phone (Indian mobile), line1, optional line2, city, state, postalCode (6-digit
+  PIN) and country.
+* Country is deliberately constrained to IN, consistent with the existing
+  Indian phone/PIN validation in the codebase, rather than falsely claiming
+  universal international address validation.
+* Per-user maximum of 10 addresses. First saved address becomes default; exactly
+  one default per user is maintained; deleting the default deterministically
+  promotes the next remaining address.
+* AddressDto returns owner postal fields only — no userId, no timestamps, no
+  internal account fields.
+* Registered the address module in the server entry (backend-only), emitting all
+  five functions without touching any frontend route or component.
+
+Testing:
+* npx vitest --run --config ./vitest.server.config.ts with a fresh temporary
+  MH_DATA_FILE: 4 files, 52/52 tests passed.
+* Added 11 address tests: full field validation, mass-assignment rejection,
+  partial-update/clear-line2 rules, UUID id shape, first/only-default invariant,
+  single-default-per-user without cross-user effect, cross-user read/update/
+  delete/set-default IDOR denial, deterministic default promotion on delete,
+  per-user (not global) 10-address cap, safe field updates, and DTO internal
+  field exclusion.
+* Typecheck: no new errors (only the two pre-existing stale shadcn UI wrappers).
+* npm run build: exit 0; server bundle present; emitted function count 27
+  (22 prior + five address functions), all five address handlers verified in the
+  server bundle.
+* Confirmed no diffs to src/routes, src/components, src/lib/store.tsx,
+  checkout.ts or auth.ts.
+
+Agent Response Summary:
+Completed Phase 3 address APIs in the separate post-hack branch with session-only
+ownership, strict input contracts, server-generated IDs, a per-user address cap,
+a single-default invariant, cross-user IDOR protection and owner-only DTOs.
+Checkout, authentication, cart and product behavior are unchanged. Phase 3 source
+commit is 4f7b961b7279eea4866feaf7492b2207d6f2b7a9.
+
+Commit SHA:
+4f7b961b7279eea4866feaf7492b2207d6f2b7a9 (post-hack Phase 3 code)
+
+Files Modified / Created:
+* src/lib/api/addresses.ts (Created)
+* src/lib/server/addresses.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/server.ts (Modified — server-only address registration)
+* src/test/addresses.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected Phase 2 persistence/guard/DTO baseline in the isolated worktree
+* Added address persistence, service, guard, DTO and five server functions
+* Added focused address security tests and registered them in the Node test config
+* Ran the server test suite with temporary data; 52/52 passed
+* Ran typecheck and production build; verified emitted address handlers
+* Restored irrelevant generated route-tree churn
+* Did not push
+
+================================================================================
+[2026-10-06T13:56:30+05:30] Post-hack Phase 4: vendor registration & profile APIs
+================================================================================
+User Prompt (verbatim):
+Continue with Phase 4 — Vendor Registration and Profile APIs. (backend only;
+DB/deploy handled by a teammate; no PostgreSQL/deploy; reuse existing data layer;
+do not change auth/product/cart/address/checkout; implement applyForVendor,
+getMyVendorProfile, updateMyVendorProfile, getVendorApplicationStatus with
+server-controlled status, one profile/application per user, no self-approval,
+strict allow-list, IDOR protection, DTO minimization, tests.)
+
+Agent Response:
+Implemented Phase 4 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, auth, product, cart, address,
+checkout, frozen submission, DB-migration or deploy work was changed.
+
+APIs implemented (all authenticated server functions, backend-only registration):
+* applyForVendor (POST) — any authenticated user submits a vendor application.
+* getVendorApplicationStatus (GET) — the caller's own application or null.
+* getMyVendorProfile (GET) — the caller's approved vendor record via requireVendor.
+* updateMyVendorProfile (POST) — safe display fields of the caller's own store.
+
+Security rules:
+* userId always from requireUser()/requireVendor(); no endpoint accepts userId
+  or vendorId. Profile ownership derives from the session, so cross-vendor IDOR
+  is structurally impossible (there is no id parameter to swap).
+* strictObj allow-lists. Application accepts only storeName, description,
+  category, phone, city. Profile update accepts only name, tagline, city.
+  status, verified, approved, role, rating, since, userId, vendorId and id are
+  rejected as invalid request fields.
+* Applications are created server-side as Pending with reviewer/timestamps null;
+  the applicant cannot self-approve/verify/activate. The only status transition
+  is reviewApplication (admin review, Phase 5), which also rejects a second
+  review. Status is never derived from client input.
+* One application per user and one vendor per user: applying is rejected if the
+  user already sells or already has an application.
+* Vendor status for existing sellers remains server-controlled; profile update
+  cannot touch status/verified/rating/since/owner/id.
+* New VendorApplicationDto and reused VendorDto omit userId, reviewedByUserId
+  and all account/security identifiers.
+* Data layer reused: added VendorApplicationRow + vendorApplications Map with
+  hydration/snapshot, consistent with existing tables. No DB migration.
+
+Tests passed:
+* 12 new vendor-registration tests: application field validation, privilege-
+  escalation field rejection, Pending creation with no self-approval, one-per-
+  user, rejection for existing seller, per-user application isolation, single
+  admin-review transition, profile patch validation, profile mass-assignment
+  rejection, profile DTO identifier exclusion, and ownership-by-row invariant.
+* Full server suite: 5 files, 64/64 passed (25 backend + 9 product + 7 cart +
+  11 address + 12 vendor-registration), fresh temporary MH_DATA_FILE.
+* Typecheck: no new errors (only the two pre-existing stale shadcn UI wrappers).
+
+Build result:
+* npm run build exit 0; server bundle present; emitted server function count 31
+  (27 prior + four vendor-registration functions); all four handlers verified in
+  the server bundle.
+* Confirmed no diffs to src/routes, src/components, src/lib/store.tsx, checkout,
+  auth, cart, address, product, session or password modules.
+
+Remaining backend work:
+* Phase 5 Admin APIs (incl. the admin review path that calls reviewApplication
+  and, on approval, links a vendor row + elevates role + revokes sessions).
+* Dedicated inventory-adjustment workflow.
+* Frontend integration of product/cart/address/vendor APIs.
+* PostgreSQL migration and deployment (owned by a teammate).
+
+Agent Response Summary:
+Delivered Phase 4 vendor registration/profile APIs in the separate post-hack
+branch with server-controlled application status, no self-approval, one
+application/profile per user, session-scoped profile ownership, strict input
+contracts, privilege-escalation rejection and minimized DTOs. 64/64 server tests
+pass and the production build is clean. Phase 4 source commit is
+f7c0f6bb62b2aab201da949e91a29953064335b0.
+
+Commit SHA:
+f7c0f6bb62b2aab201da949e91a29953064335b0 (post-hack Phase 4 code)
+
+Files Modified / Created:
+* src/lib/api/vendor-registration.ts (Created)
+* src/lib/server/vendor-applications.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/server.ts (Modified — server-only registration)
+* src/test/vendor-registration.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected vendor model, guards, DTO and seed in the isolated worktree
+* Added vendor application persistence, service, DTOs and four server functions
+* Reused requireVendor for session-scoped profile ownership
+* Added 12 vendor-registration security tests and registered them in the Node config
+* Ran the full server suite with temporary data; 64/64 passed
+* Ran typecheck and production build; verified emitted vendor-registration handlers
+* Restored irrelevant generated route-tree churn
+* Did not push

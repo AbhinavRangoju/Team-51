@@ -55,6 +55,23 @@ export function obj(raw: unknown): Record<string, unknown> {
   return raw as Record<string, unknown>;
 }
 
+/**
+ * Strict allow-list object parser for new write/query contracts.
+ *
+ * `obj()` only proves a value is an object. APIs that mutate or filter data
+ * need the next guarantee as well: an attacker cannot smuggle a field such as
+ * `vendorId`, `role`, `status`, `price`, or `stock` through an object spread.
+ * Existing frozen endpoint validators keep their compatibility; new endpoints
+ * use this helper exclusively.
+ */
+export function strictObj(raw: unknown, allowed: readonly string[]): Record<string, unknown> {
+  const body = obj(raw);
+  for (const key of Object.keys(body)) {
+    if (!allowed.includes(key)) throw badRequest("Invalid request field.");
+  }
+  return body;
+}
+
 export function str(
   raw: unknown,
   field: string,
