@@ -138,20 +138,20 @@ MarketHub is a single deployable artifact, not a microservice fleet. There is no
 │                                                                      │
 │  Server core       src/lib/server/*  ← never reaches the browser     │
 │    db · pricing · password · session · guards · dto · validate       │
-│    · ratelimit · seed                                                │
+│    · ratelimit · seed · store-json / store-postgres                   │
 └──────────────┬──────────────────────────────────┬────────────────────┘
                │                                  │ outbound HTTPS
-┌─ TB3 ─ JSON store ────────────┐   ┌─ TB4 ─ Google Gemini ───────────┐
-│  data/markethub.json          │   │  generativelanguage.googleapis  │
-│  debounced atomic write-then- │   │  Untrusted output. Fixed URL.   │
-│  rename, gitignored. Accounts,│   │  Key never leaves TB2.          │
-│  sessions, orders, stock.     │   │                                 │
+┌─ TB3 ─ Persistence ───────────┐   ┌─ TB4 ─ Google Gemini ───────────┐
+│  Neon Postgres (when          │   │  generativelanguage.googleapis  │
+│  DATABASE_URL set) OR JSON    │   │  Untrusted output. Fixed URL.   │
+│  data/markethub.json fallback │   │  Key never leaves TB2.          │
+│  Same in-memory working set.  │   │                                 │
 └───────────────────────────────┘   └─────────────────────────────────┘
 ```
 
 `src/lib/server/*` is reached only through `await import()` inside a handler body, which keeps it — and anything it touches, including secrets — out of the client bundle entirely.
 
-The architecturally important property is that server functions are the **only** write path. A control placed in middleware cannot be routed around, because there is no other endpoint. There is no database server, no Redis, no reverse proxy and no container orchestration: a deliberate, time-boxed choice defended in §2.3, ADR-007 and ADR-009.
+The architecturally important property is that server functions are the **only** write path. A control placed in middleware cannot be routed around, because there is no other endpoint. Persistence is Neon Postgres when `DATABASE_URL` is set, otherwise the JSON file store — see ADR-010 (which supersedes the "revisit after the event" note in ADR-007).
 
 ### 2.2 Data Flow & Component Interaction
 
@@ -174,7 +174,7 @@ The architecturally important property is that server functions are the **only**
 
 - **Backend / API framework: TanStack Start server functions (`createServerFn`) on nitro.** *Why chosen:* the frontend was already built on it, the global middleware hook and a working CSRF middleware already existed in this repository, and it keeps one build and one deploy artifact. *Rejected:* a separate **Express** or **NestJS** service — a second process, a second deploy target, cross-origin/CORS plumbing, hand-rolled CSRF and its own session transport, for no control we cannot implement here. The first audit of this repo wrongly concluded no server boundary existed (it searched for `*.server.ts` filenames; Start server functions live in ordinary `.ts` modules), which inflated the cost of this option before the error was caught and recorded. See ADR-002.
 - **Frontend / client: React 19 + TanStack Router (SSR + hydration), Vite 8, Tailwind CSS 4, shadcn/ui.** *Why chosen:* inherited from the existing `src/` tree; typed routing gives compile-time detection of dead links, which is how the nine unbuilt routes were found. **Vite 8 specifically** was forced: the nitro build plugin requires `^8`, and `@vitejs/plugin-react` 6 peers `^8`. *Rejected:* **Next.js** — the original security document assumed it, but the app was already written against TanStack Start and a framework migration inside 24 hours would have spent the whole budget. **`resolve.tsconfigPaths`** was rejected in favour of an explicit `resolve.alias`, because it is a Vite 8 feature that was silently inert on 7 and broke every `@/` import. See ADR-001.
-- **Database & persistence: a hand-written JSON-backed store with zero dependencies, at `data/markethub.json`, debounced atomic write-then-rename, gitignored.** *Why chosen:* no managed database is available to this team inside the hackathon window, and a store that works on a laptop and on a single Node host is the only thing that can be demonstrated end-to-end. *Rejected:* **PostgreSQL + Prisma** (no instance, no migration budget, and the original document's Row-Level Security design presumes one), **Redis** for rate-limit and lockout counters (second service; the in-process limiter already proves the pattern), and **SQLite** — which was in fact the first choice and failed on the environment: `node:sqlite` does not exist on Node 20, and the `better-sqlite3` native build timed out. Residual risk is stated plainly in ADR-007.
+- **Database & persistence: Neon Postgres when `DATABASE_URL` is set, otherwise the hand-written JSON file store at `data/markethub.json`.** *Why chosen:* Neon is managed, serverless, and the pooled HTTP driver needs no native build (the failure mode that killed SQLite in ADR-003/ADR-007). The in-memory working set and synchronous `tx()` stay, so zero callers change. See ADR-010. *Rejected for the primary path still:* **Prisma/ORM** (hand-rolled parameterized SQL matches the rest of the stack), **Redis**, and native SQLite.
 - **Authentication & cryptography: `node:crypto` `scrypt` (N=2^15) with a 16-byte per-user salt and `timingSafeEqual` comparison; `crypto.randomBytes` for 256-bit session ids; server-side session records in `httpOnly` cookies.** *Why chosen:* `scrypt` is in the Node standard library, is memory-hard, and needs no compiler. *Rejected:* **bcrypt** and **argon2** — Argon2id would be marginally preferable, but every implementation is a native dependency, and native builds on Windows were a demonstrated hard stop for part of this team. **JWTs carrying role claims** were rejected because they cannot be revoked at sign-out without inventing a server-side denylist anyway. See ADR-003 and ADR-004.
 - **Money: integer paise end to end.** Rupee floats stop reconciling once summed, so no float ever represents money.
 - **AI: Google Gemini over plain `fetch`, no SDK.** *Why chosen:* one REST call, zero new dependencies, nothing between our code and the wire. *Rejected:* the official SDK (extra supply-chain surface for a single endpoint) and a `VITE_`-prefixed key (would publish a billable key to every visitor).
@@ -308,6 +308,16 @@ All times IST. Reconstructed from [`docs/logs.txt`](logs.txt); commit SHAs verif
   2. Leave the public catalogue client-side and move only the figures that carry authority.
 - **Decision & Rationale:** Option 2. The catalogue is public, so serving it from the client leaks nothing, and product imagery genuinely cannot live in a data row. Only the figures that carry authority — price, stock, ownership — moved server-side. Rewriting every browse page would have consumed the time the security work needed, for no security gain.
 - **Security & Performance Trade-offs:** The browse pages can show a stale stock number after a purchase. `getQuote` reports the true availability and `placeOrder` is strict, so the worst case is a corrected message at checkout rather than an oversell. Client-side catalogue data also keeps the browse path cacheable and fast.
+
+### ADR-010: Neon Postgres behind the existing store interface, with the JSON file store as fallback
+- **Status:** Accepted
+- **Context:** ADR-007 shipped a JSON file store under time pressure and explicitly deferred a real database. A Neon Postgres instance is now available via `DATABASE_URL`. Callers across `src/lib/api/*` mutate live `Map` rows inside synchronous `tx()`; making `db()` async would rewrite every caller and destroy the atomicity argument.
+- **Options Considered:**
+  1. Rewrite the store as an async repository (Prisma / Drizzle / hand-rolled async methods).
+  2. Keep the in-memory working set and pluggable persistence (`StorePersistence`), selecting Neon when `DATABASE_URL` is set and JSON otherwise.
+  3. Leave JSON-only and ignore the provisioned database.
+- **Decision & Rationale:** Option 2. Neon is managed and serverless; `@neondatabase/serverless` HTTP path needs no native build (the SQLite failure mode). Hand-written parameterized SQL only — no ORM, never `sql.unsafe()`. Schema under `mh_*` with `migrations/001_init.sql` and an `mh_migrations` ledger. Timestamps stay `text` so ISO strings round-trip losslessly for `localeCompare` sorts. Flush is a constant 11-statement upsert/delete transaction (parent-first upserts, child-first deletes). `ensureStoreReady()` hydrates before handlers via middleware in `src/start.ts`. JSON fallback keeps `npm test` identical.
+- **Security & Performance Trade-offs:** Every statement is parameterized; credentials never logged (`redactDbUrl`); TLS via `sslmode=require`. Honest costs: O(rows) snapshot flush, durability now depends on a network hop, and **horizontal scaling is still not solved** because each process holds its own working set. Unit tests delete `DATABASE_URL` so they cannot touch the live DB.
 
 ---
 

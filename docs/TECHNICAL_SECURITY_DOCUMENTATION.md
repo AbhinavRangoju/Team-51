@@ -261,18 +261,15 @@ service. A separate backend exists on the unmerged `origin/backend` branch and
 is **not** wired into the storefront.
 
 ### Database
-**None in this build.** All application state is held client-side in
-`localStorage` under a single key, `markethub-state-v1`: session, saved
-addresses, cart, wishlist, orders and notification read-state. The product
-catalogue (12 products, 8 sellers, 8 categories) is a typed static module,
-`src/lib/data.ts`, which is the single source of truth for both the UI and the
-AI assistant's grounding snapshot.
+**Neon Postgres when `DATABASE_URL` is set; otherwise the JSON file store** at
+`data/markethub.json`. Schema tables are prefixed `mh_*` (users, sessions,
+vendors, products, orders, meta, migrations). The in-memory working set in
+`src/lib/server/db.ts` remains the synchronous API for callers; Postgres is the
+persistence backend only. Cart/wishlist convenience state stays in the browser.
 
-**Security consequence, stated rather than hidden:** client-held state is
-client-controlled. A visitor can edit their own role, orders and prices via
-developer tools. This is acceptable for a demonstration storefront and
-unacceptable for production; the mitigation is the server-authoritative design
-in `SECURITY_ARCHITECTURE.md`, which is **designed, not implemented**.
+**Security consequence:** SQL is exclusively parameterized (`$n` binds); credentials
+are never logged; TLS via `sslmode=require`. Authorization still rests on the
+application layer (`guards.ts`), not database RLS.
 
 ### APIs / Integrations
 | Integration | Purpose | Security handling |
@@ -459,7 +456,7 @@ Mapped to OWASP Top 10 (2021):
 |---|---|
 | **A01 Broken Access Control** | Partially addressed. Order data scoped per account; `noindex` on personal pages; open-redirect guard on `/login`. **Gap:** gates are client-side, so this is not enforceable. |
 | **A02 Cryptographic Failures** | No secrets in the client bundle (verified); `.env` gitignored; no card data transmitted or stored. **Gap:** no password hashing because no credential store exists. |
-| **A03 Injection** | Addressed for the paths that exist. No SQL (no database). React auto-escaping throughout; the sole `dangerouslySetInnerHTML` lives in an unimported file that is absent from the shipped bundle (verified). Prompt injection explicitly defended (below). |
+| **A03 Injection** | Addressed for the paths that exist. SQL exists only in the Neon persistence layer and is exclusively parameterized with zero interpolation of request data; React auto-escaping throughout; the sole `dangerouslySetInnerHTML` lives in an unimported file that is absent from the shipped bundle (verified). Prompt injection explicitly defended (below). |
 | **A04 Insecure Design** | Trust boundaries documented; `SECURITY_ARCHITECTURE.md` sets the server-authoritative target. **Gap:** that target is not yet implemented. |
 | **A05 Security Misconfiguration** | Env vars deliberately not `VITE_`-prefixed, with a comment in `.env.example` warning against it; `.env` gitignored and verified untracked before every push. |
 | **A07 Identification & Authentication Failures** | **Known, disclosed gap.** No real authentication. Documented in the UI at three separate points. |
@@ -802,8 +799,9 @@ Build output: `.output/server/index.mjs` plus 65 hashed client assets in
   environment variables must be provided by the host.
 
 Recommended target: any Node-capable host (Vercel, Render, Railway, Fly.io) with
-the environment variable set. No database or external service needs
-provisioning, because this build has neither.
+`DATABASE_URL` (Neon pooled endpoint, `sslmode=require`) and optional
+`GEMINI_API_KEY` provided by the host. Run `npm run db:migrate` once against the
+database before first boot.
 
 **No credentials are disclosed in this document.**
 

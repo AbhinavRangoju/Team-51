@@ -2,6 +2,13 @@ import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/r
 
 import { renderErrorPage } from "./lib/error-page";
 
+/** Hydrate the Postgres-backed store before any handler touches db(). */
+const storeReadyMiddleware = createMiddleware().server(async ({ next }) => {
+  const { ensureStoreReady } = await import("./lib/server/db");
+  await ensureStoreReady();
+  return next();
+});
+
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
@@ -25,5 +32,5 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [storeReadyMiddleware, errorMiddleware, csrfMiddleware],
 }));
