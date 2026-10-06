@@ -4856,3 +4856,24 @@ Actions Taken:
 * Implemented store adapters + db coordinator + middleware
 * Unit + live tests + build; client bundle leak scan
 
+
+================================================================================
+[2026-10-06T14:27:29+05:30] Commit SHA amendment for prior turn
+================================================================================
+User Prompt (verbatim):
+(amendment — prior turn Commit SHA was PENDING pending git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>")
+
+Agent Response:
+Recorded commit SHA 3caa312b26c97c4037070c3b834cf045b292e49f for the Neon Postgres integration turn.
+
+Agent Response Summary:
+Append-only amendment linking the previous turn entry to its commit.
+
+Commit SHA:
+3caa312b26c97c4037070c3b834cf045b292e49f
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" of Neon integration files -> 3caa312b
