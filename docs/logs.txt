@@ -2169,3 +2169,58 @@ Actions Taken:
 * Added data/ to .gitignore and confirmed with `git check-ignore -v`
 * Deleted scratch files (install.log, build.log, probe.txt, auth-mod.txt, probe2.txt, probe-url.test.ts)
 * Did NOT push, per instruction
+
+--------------------------------------------------------------------------------
+[2026-10-06T09:18:40+05:30] COMMIT RECORD for the preceding turn
+--------------------------------------------------------------------------------
+Commit SHA:
+e2d6d38
+
+Commit Message:
+feat(backend): server-authoritative auth, authorization, checkout and orders
+
+Branch:
+backend
+
+Files in commit:
+* .env.example (Created)
+* .gitignore (Modified)
+* docs/APPROACH.md (Modified)
+* docs/logs.txt (Modified)
+* package-lock.json (Modified)
+* src/lib/api/auth.ts (Created)
+* src/lib/api/checkout.ts (Created)
+* src/lib/api/orders.ts (Created)
+* src/lib/api/vendor.ts (Created)
+* src/lib/money.ts (Created)
+* src/lib/server/db.ts (Created)
+* src/lib/server/dto.ts (Created)
+* src/lib/server/guards.ts (Created)
+* src/lib/server/password.ts (Created)
+* src/lib/server/pricing.ts (Created)
+* src/lib/server/ratelimit.ts (Created)
+* src/lib/server/seed.ts (Created)
+* src/lib/server/session.ts (Created)
+* src/lib/server/validate.ts (Created)
+* src/lib/store.tsx (Modified)
+* src/test/backend.test.ts (Created)
+* src/components/auth/AuthPanel.tsx (Modified)
+* src/components/mh/RequireAuth.tsx (Modified)
+* src/routes/account.tsx (Modified)
+* src/routes/cart.tsx (Modified)
+* src/routes/checkout.tsx (Modified)
+* src/routes/orders.tsx (Modified)
+* src/routes/vendor.tsx (Modified)
+* src/routeTree.gen.ts (Modified)
+
+Push:
+NOT pushed, per explicit instruction. When cleared, run:
+  git push origin backend
+Origin is https://github.com/AbhinavRangoju/Team-51.git and origin/backend exists.
+
+Outstanding before the 2026-10-06T11:00:00+05:30 freeze:
+* metadata/submission.yaml commit_sha is still empty.
+* metadata/submission.yaml deployment_url is still empty; nothing is deployed.
+* deployment/README.md has no deployment record.
+* Set NODE_ENV=production on any deployment; that is what enables the Secure
+  flag on the session cookie.
