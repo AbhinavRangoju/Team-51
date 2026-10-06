@@ -2962,4 +2962,120 @@ Files Modified / Created:
 Actions Taken:
 * Reused the frozen-SHA verification and role specification analysis from the previous turn
 * Did not modify application, frontend, architecture, metadata, or submission files
-* Did not push
+
+================================================================================
+[2026-10-06T11:23:39+05:30] Plan separate post-hackathon backend completion
+================================================================================
+User Prompt (verbatim):
+I want to complete the remaining MarketHub backend in a separate post-hackathon development branch/repository. Do NOT modify or contaminate the frozen hackathon submission.
+
+I am Member 1 — Backend only.
+
+Current frozen backend already has:
+
+- Authentication and secure sessions
+
+- Server-side roles and authorization
+
+- Customer/vendor ownership isolation
+
+- Server-authoritative pricing and checkout
+
+- Stock handling and idempotency
+
+- Customer orders/cancellation
+
+- Vendor order handling
+
+- CSRF, validation, rate limiting and safe errors
+
+- Security tests
+
+Now complete the missing backend scope:
+
+1. Product APIs
+
+   - public product listing
+
+   - product details
+
+   - search/filter
+
+   - vendor product create/update/delete
+
+   - vendor ownership enforcement
+
+2. Persistent cart APIs
+
+   - get cart
+
+   - add/update/remove items
+
+   - authenticated user isolation
+
+   - server-side validation
+
+3. Address APIs
+
+   - list/create/update/delete
+
+   - user ownership enforcement
+
+4. Vendor registration/profile backend
+
+   - vendor application
+
+   - vendor profile
+
+   - vendor status/approval
+
+5. Admin backend APIs
+
+   - user management
+
+   - vendor approval/management
+
+   - product oversight
+
+   - order oversight
+
+   - strict admin authorization
+
+6. Improve the persistence layer to a proper database when practical.
+
+Rules:
+
+- Backend only.
+
+- Do not redesign the frontend.
+
+- Do not add AI.
+
+- Do not remove or weaken existing security controls.
+
+- Reuse the existing auth, authorization and validation patterns.
+
+- Never trust client roles, prices, totals, stock, ownership or order state.
+
+- Add tests for every new security-sensitive feature.
+
+- Inspect the existing implementation before changing anything.
+
+- Implement one area at a time.
+
+- After each area, run tests and report what was completed and what remains.
+
+Start by inspecting the current backend and produce the implementation plan. Do not code until the plan is clear.
+
+<EnvironmentContext>
+This information is provided as context about user environment. Only consider it if it's relevant to the user request ignore it otherwise.
+
+<OPEN-EDITOR-FILES>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\MarketHub_shared_project_roles.md" />
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</OPEN-EDITOR-FILES>
+
+<ACTIVE-EDITOR-FILE>
+<file name="c:\Users\Vivek\OneDrive\Desktop\Team-51\SECURITY_ARCHITECTURE.md" />
+</ACTIVE-EDITOR-FILE>
+</EnvironmentContext>
