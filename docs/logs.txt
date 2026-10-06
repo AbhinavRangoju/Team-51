@@ -3074,3 +3074,101 @@ Actions Taken:
 * Ran typecheck and production build; verified emitted address handlers
 * Restored irrelevant generated route-tree churn
 * Did not push
+
+================================================================================
+[2026-10-06T13:56:30+05:30] Post-hack Phase 4: vendor registration & profile APIs
+================================================================================
+User Prompt (verbatim):
+Continue with Phase 4 — Vendor Registration and Profile APIs. (backend only;
+DB/deploy handled by a teammate; no PostgreSQL/deploy; reuse existing data layer;
+do not change auth/product/cart/address/checkout; implement applyForVendor,
+getMyVendorProfile, updateMyVendorProfile, getVendorApplicationStatus with
+server-controlled status, one profile/application per user, no self-approval,
+strict allow-list, IDOR protection, DTO minimization, tests.)
+
+Agent Response:
+Implemented Phase 4 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, auth, product, cart, address,
+checkout, frozen submission, DB-migration or deploy work was changed.
+
+APIs implemented (all authenticated server functions, backend-only registration):
+* applyForVendor (POST) — any authenticated user submits a vendor application.
+* getVendorApplicationStatus (GET) — the caller's own application or null.
+* getMyVendorProfile (GET) — the caller's approved vendor record via requireVendor.
+* updateMyVendorProfile (POST) — safe display fields of the caller's own store.
+
+Security rules:
+* userId always from requireUser()/requireVendor(); no endpoint accepts userId
+  or vendorId. Profile ownership derives from the session, so cross-vendor IDOR
+  is structurally impossible (there is no id parameter to swap).
+* strictObj allow-lists. Application accepts only storeName, description,
+  category, phone, city. Profile update accepts only name, tagline, city.
+  status, verified, approved, role, rating, since, userId, vendorId and id are
+  rejected as invalid request fields.
+* Applications are created server-side as Pending with reviewer/timestamps null;
+  the applicant cannot self-approve/verify/activate. The only status transition
+  is reviewApplication (admin review, Phase 5), which also rejects a second
+  review. Status is never derived from client input.
+* One application per user and one vendor per user: applying is rejected if the
+  user already sells or already has an application.
+* Vendor status for existing sellers remains server-controlled; profile update
+  cannot touch status/verified/rating/since/owner/id.
+* New VendorApplicationDto and reused VendorDto omit userId, reviewedByUserId
+  and all account/security identifiers.
+* Data layer reused: added VendorApplicationRow + vendorApplications Map with
+  hydration/snapshot, consistent with existing tables. No DB migration.
+
+Tests passed:
+* 12 new vendor-registration tests: application field validation, privilege-
+  escalation field rejection, Pending creation with no self-approval, one-per-
+  user, rejection for existing seller, per-user application isolation, single
+  admin-review transition, profile patch validation, profile mass-assignment
+  rejection, profile DTO identifier exclusion, and ownership-by-row invariant.
+* Full server suite: 5 files, 64/64 passed (25 backend + 9 product + 7 cart +
+  11 address + 12 vendor-registration), fresh temporary MH_DATA_FILE.
+* Typecheck: no new errors (only the two pre-existing stale shadcn UI wrappers).
+
+Build result:
+* npm run build exit 0; server bundle present; emitted server function count 31
+  (27 prior + four vendor-registration functions); all four handlers verified in
+  the server bundle.
+* Confirmed no diffs to src/routes, src/components, src/lib/store.tsx, checkout,
+  auth, cart, address, product, session or password modules.
+
+Remaining backend work:
+* Phase 5 Admin APIs (incl. the admin review path that calls reviewApplication
+  and, on approval, links a vendor row + elevates role + revokes sessions).
+* Dedicated inventory-adjustment workflow.
+* Frontend integration of product/cart/address/vendor APIs.
+* PostgreSQL migration and deployment (owned by a teammate).
+
+Agent Response Summary:
+Delivered Phase 4 vendor registration/profile APIs in the separate post-hack
+branch with server-controlled application status, no self-approval, one
+application/profile per user, session-scoped profile ownership, strict input
+contracts, privilege-escalation rejection and minimized DTOs. 64/64 server tests
+pass and the production build is clean. Phase 4 source commit is
+f7c0f6bb62b2aab201da949e91a29953064335b0.
+
+Commit SHA:
+f7c0f6bb62b2aab201da949e91a29953064335b0 (post-hack Phase 4 code)
+
+Files Modified / Created:
+* src/lib/api/vendor-registration.ts (Created)
+* src/lib/server/vendor-applications.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/server.ts (Modified — server-only registration)
+* src/test/vendor-registration.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected vendor model, guards, DTO and seed in the isolated worktree
+* Added vendor application persistence, service, DTOs and four server functions
+* Reused requireVendor for session-scoped profile ownership
+* Added 12 vendor-registration security tests and registered them in the Node config
+* Ran the full server suite with temporary data; 64/64 passed
+* Ran typecheck and production build; verified emitted vendor-registration handlers
+* Restored irrelevant generated route-tree churn
+* Did not push
