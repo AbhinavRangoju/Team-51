@@ -62,6 +62,10 @@
   --color-scene: var(--scene);
   --shadow-card: var(--shadow-card);
   --shadow-lift: var(--shadow-lift);
+  /* Tokens the onboarding flow expects: `bg-ink` for the dark logo badge and
+     `animate-fade-in` for inline field errors. */
+  --color-ink: var(--mob-ink);
+  --animate-fade-in: ob-fade-in 0.2s both;
 }
 
 :root {
@@ -202,4 +206,47 @@
 @media (prefers-reduced-motion: reduce) {
   .mob, .eye-blink, .form-swap { animation: none !important; }
   .eye-lid, .mob-face { transition-duration: 0.01s !important; }
+}
+
+/* ---------- Onboarding ---------- */
+.ob-in-right { animation: ob-in-r 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ob-in-left { animation: ob-in-l 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes ob-in-r { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes ob-in-l { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+
+.ob-panel-in { animation: form-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+.ob-illus { animation: ob-illus 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes ob-illus { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+
+.ob-rise { animation: ob-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes ob-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.ob-float { transform-box: fill-box; animation: ob-float 4.5s ease-in-out infinite; }
+.ob-float-slow { animation-duration: 6s; }
+
+@keyframes ob-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-7px) rotate(-1deg); } }
+
+.ob-grow { transform-box: fill-box; transform-origin: left center; animation: ob-grow 1s 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes ob-grow { from { transform: scaleX(0); } }
+
+.ob-rise-bar { transform-box: fill-box; transform-origin: bottom; animation: ob-bar 0.8s 0.25s cubic-bezier(0.2, 0.8, 0.2, 1.2) both; }
+
+@keyframes ob-bar { from { transform: scaleY(0); } }
+
+.ob-pop { animation: ob-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+
+@keyframes ob-pop { 0% { transform: scale(1); } 40% { transform: scale(1.12) rotate(-6deg); } 100% { transform: scale(1); } }
+
+/* Backs the `animate-fade-in` utility used for inline field errors. */
+@keyframes ob-fade-in { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-float, .ob-grow, .ob-rise-bar, .ob-pop, .ob-illus { animation: none !important; }
+  .ob-in-right, .ob-in-left, .ob-rise, .ob-panel-in { animation: ob-fade 0.2s both !important; }
+  @keyframes ob-fade { from { opacity: 0; } }
 }
