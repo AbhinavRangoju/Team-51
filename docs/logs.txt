@@ -1874,3 +1874,82 @@ Actions Taken:
 * Verified /onboarding is present in the regenerated src/routeTree.gen.ts
 * Verified .ob-in-right/.ob-in-left/.ob-rise/.ob-float/.ob-pop/.ob-illus/.ob-grow/.ob-rise-bar/.ob-panel-in, .bg-ink, and .animate-fade-in all compiled into the CSS bundle
 * Ran `git status --short` (confirmed .output/ and .tanstack/ are gitignored), staged the eight files by name, committed as cb8955a
+
+================================================================================
+[2026-10-06T11:27:39+05:30] Wire sign-in to trigger the onboarding flow
+================================================================================
+User Prompt (verbatim):
+i just signed in with a mail but it didnt trigger the onboarding
+
+Agent Response:
+Diagnosed and fixed. This was the loose end flagged at the end of the previous
+turn: the onboarding route existed and rendered, but nothing ever navigated to
+it, so it was reachable only by typing the URL.
+
+Root cause in src/components/auth/AuthPanel.tsx. useSignIn(redirect) is the
+shared choke point for all three sign-in entry points — LoginForm, SignupForm and
+the simulated Google button in SocialLogin all call it. It computed its
+destination as `redirect || fallback`, where fallback is "/vendor" for a vendor
+session, "/admin" for admin, and "/" for everyone else. postLoginPath() from
+src/lib/onboarding-store.ts was exported by the handed-over code but had no
+caller, so "/onboarding" was never in the set of possible destinations. Signing
+in with an email therefore landed on the storefront home, exactly as reported.
+
+Fix: useSignIn now consults postLoginPath(), which answers "/onboarding" only
+while the first run is outstanding:
+
+  const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
+
+Two deliberate decisions in that line. First, the onboarding gate outranks the
+RequireAuth deep link: a signed-out visitor bounced from /account to
+/login?redirect=/account will, on a first run only, land on onboarding rather
+than /account. Treating a first-run gate as lower priority than a redirect would
+mean it never fires for anyone arriving via a gated page. Second, once onboarding
+is complete the pre-existing destination logic is used verbatim rather than
+postLoginPath()'s roleHome() answer — the session role from the RolePicker is
+what actually gates /vendor, whereas roleHome() reads the separate onboarding
+role, and preserving the existing branch keeps behaviour identical for everyone
+who has already been through the flow.
+
+Because all three entry points share useSignIn, the one-line change covers email
+login, account creation and the Google button together. No change was needed in
+any of the handed-over onboarding files.
+
+Flagged for the participant: the completion flag lives in localStorage under
+"markethub.onboarding", so the gate is per-browser, not per-account — it fires
+once per device regardless of which email signs in. Anyone who already clicked
+through /onboarding while testing has onboardingCompleted: true and will keep
+skipping it; clearing that single localStorage key (or calling the exported
+resetOnboarding()) re-arms it. Also noted that the onboarding role choice and the
+sign-in RolePicker are two independent notions in the current design, so signing
+in as Seller and then picking Shop in onboarding lands on /shop.
+
+Agent Response Summary:
+Found that the onboarding page was never being navigated to because
+postLoginPath() had no caller, and wired it into useSignIn in
+src/components/auth/AuthPanel.tsx — the single shared handler behind the login
+form, signup form and Google button. First-run sign-ins now land on /onboarding;
+once the flow is completed the previous redirect/role-home logic applies
+unchanged. Verified with tsc (the same 11 pre-existing errors in the vendored
+src/components/ui/calendar.tsx and src/components/ui/chart.tsx, zero in
+AuthPanel.tsx or any onboarding file) and a full npm run build (exit 0), and
+confirmed in the emitted bundles that the login chunk now references
+"/onboarding" and that onboarding-store is a shared chunk carrying the
+"markethub.onboarding" key. Browser runtime behaviour was not verified this turn.
+
+Commit SHA:
+86ed94b8ffa6f892fd5f6b602f1a0a8676138453
+
+Files Modified / Created:
+* src/components/auth/AuthPanel.tsx (Modified)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read src/components/auth/AuthPanel.tsx in full; traced useSignIn as the shared handler for LoginForm, SignupForm and SocialLogin
+* Read src/lib/store.tsx (login/useStore) to confirm what the session role controls
+* Searched src/ for `redirect:` — found the producer is src/components/mh/RequireAuth.tsx and the validator is safeRedirect in src/routes/login.tsx; weighed gate-vs-redirect precedence against both
+* Added the postLoginPath import and replaced the destination expression in useSignIn (7 insertions, 1 deletion)
+* Ran `npx tsc --noEmit` — 11 pre-existing errors in untouched vendored shadcn files, 0 in AuthPanel.tsx and 0 in the onboarding files
+* Ran `npm run build` — exit 0, server bundle and .output/nitro.json regenerated
+* Verified the built login chunk (.output/public/assets/login-B3PODlJ4.js) references "/onboarding", and that .output/public/assets/onboarding-store-Bstm17DA.js carries the "markethub.onboarding" key
+* Committed as 86ed94b
