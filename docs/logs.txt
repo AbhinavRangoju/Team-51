@@ -1687,3 +1687,89 @@ Actions Taken:
 * git branch -r -v  -> found origin/backend
 * git merge-base --is-ancestor origin/backend origin/main  -> not merged
 * Verified file counts and SECURITY_ARCHITECTURE.md / team.yaml on origin/main
+
+================================================================================
+[2026-10-05T21:52:00+05:30] Merge origin/main into Frontend and push
+================================================================================
+User Prompt (verbatim):
+go with it
+
+Agent Response:
+Merged origin/main into Frontend and pushed. Frontend is no longer behind main.
+
+Pre-merge state: tree CLEAN, Frontend 2 behind / 1 ahead of origin/main (the 1
+ahead being the previous turn's log commit, so a fast-forward was not possible).
+`git merge-tree --write-tree origin/main Frontend` previewed tree 432d6f7 with 0
+conflicts. Recorded rollback point aa09fd8 before touching anything.
+
+Merge: `git merge origin/main --no-edit`. Result — "Merge made by the 'ort'
+strategy", ONE file changed:
+  A  SECURITY_ARCHITECTURE.md  (+834)
+Merge commit: 11982bd
+
+Verification that the merge was purely additive:
+* `git diff --name-status aa09fd8 HEAD` -> a single line, A SECURITY_ARCHITECTURE.md
+* `git diff --name-only aa09fd8 HEAD -- src/` -> 0 files. No application code moved.
+* SECURITY_ARCHITECTURE.md present on disk.
+* npm test -> 1/1 passing
+* npm run typecheck -> 11 real errors, IDENTICAL to the pre-merge baseline
+  (chart.tsx 10, calendar.tsx 1 — the two unused shadcn wrappers). No new errors.
+* npm run build -> clean from a deleted .output: server entry present, 65 client
+  assets emitted.
+
+Post-merge: Frontend is 0 behind / 2 ahead of origin/main. The 2 ahead are the
+merge commit 11982bd and the prior log commit aa09fd8; main already contains
+everything else.
+
+TWO FALSE ALARMS during this turn, both mine, both resolved — recording so the
+record is accurate rather than tidy:
+
+1. "The build failed." A build invoked in a parallel tool call and a second
+   build invoked immediately after raced on the .output directory, and one died
+   with a buildApp stack trace. Not caused by the merge. Re-ran a single
+   isolated build after deleting .output: exit 0, artifacts present. The lesson
+   is not to run two vite builds concurrently against the same output dir.
+
+2. "The push did not land." The first `git push origin Frontend` succeeded but
+   PowerShell swallowed its output, and the follow-up `git rev-parse
+   origin/Frontend` in a compound command read a stale remote-tracking ref,
+   showing cacb0f2 and "[ahead 4]". A second push reported "Everything
+   up-to-date", which contradicted that. Settled it by querying the server
+   directly: `git ls-remote origin refs/heads/Frontend` -> 11982bd, equal to
+   local. The push had worked all along; the local tracking ref was stale.
+   `git remote update origin` then showed "## Frontend...origin/Frontend" with
+   no ahead/behind.
+
+Final: local Frontend = origin/Frontend = 11982bd (before this log commit).
+
+Reiterated for the team, now sharper than before: there are three accounts of
+what MarketHub is — SECURITY_ARCHITECTURE.md's server-authoritative design (now
+merged into Frontend), the client-only localStorage app in src/, and a teammate's
+unmerged origin/backend branch. Only one can be the submission's story.
+
+Agent Response Summary:
+Merged origin/main into Frontend: one file added, SECURITY_ARCHITECTURE.md, with
+zero changes under src/, tests still 1/1, typecheck still at its 11-error
+baseline and a clean build from scratch. Pushed; local and remote Frontend both
+at merge commit 11982bd, 0 behind main. Two scares along the way — a build failure
+and an apparently-lost push — were both artefacts of my own tooling (concurrent
+builds, a stale tracking ref) and not real problems; verified and documented.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* SECURITY_ARCHITECTURE.md (Added by merge — teammate-authored, not written by me)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git fetch origin --prune; confirmed clean tree and 2-behind/1-ahead
+* git merge-tree --write-tree origin/main Frontend -> 0 conflicts
+* Recorded rollback point aa09fd8
+* git merge origin/main --no-edit -> merge commit 11982bd
+* git diff aa09fd8 HEAD (and scoped to src/) to prove the merge was additive
+* npm test 1/1; npm run typecheck 11 (unchanged); npm run build clean from empty .output
+* git push origin Frontend
+* git ls-remote origin refs/heads/Frontend to settle the stale-ref confusion
+* git remote update origin --prune; git status -sb -> in sync
+* Deleted temporary build-err.txt, build2.txt, push.txt
