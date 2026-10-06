@@ -162,12 +162,15 @@ function ProfileTab() {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = "Enter your name";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Enter a valid email";
     if (form.phone && !/^\d{10}$/.test(form.phone)) errs.phone = "Phone must be 10 digits";
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
-    updateUser({ name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim() || undefined });
+    // Name and phone only. Email is the account identifier the server
+    // authenticates against, so changing it needs a server endpoint (with
+    // re-verification) rather than a local patch — see the read-only field
+    // below. This edit is display-only until that endpoint exists.
+    updateUser({ name: form.name.trim(), phone: form.phone.trim() || undefined });
     setSaved(true);
     toast.success("Profile updated");
     setTimeout(() => setSaved(false), 2200);
@@ -181,8 +184,8 @@ function ProfileTab() {
         <Field label="Full name" error={errors.name}>
           <input className={fieldCls} value={form.name} aria-invalid={!!errors.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
-        <Field label="Email" error={errors.email}>
-          <input className={fieldCls} type="email" value={form.email} aria-invalid={!!errors.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Field label="Email" hint="This is your sign-in address and cannot be changed here.">
+          <input className={fieldCls} type="email" value={form.email} readOnly disabled />
         </Field>
         <Field label="Mobile number" error={errors.phone} hint="Optional. Sellers use it for delivery calls.">
           <input className={fieldCls} inputMode="numeric" placeholder="9876543210" value={form.phone} aria-invalid={!!errors.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

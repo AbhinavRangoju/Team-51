@@ -7,30 +7,25 @@ import {
   LayoutDashboard,
   Package,
   PackageSearch,
+  ShieldAlert,
   ShoppingCart,
   Star,
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DashShell, PageTitle, type DashNavItem } from "@/components/mh/DashShell";
 import { EmptyState, StatCard, StatusBadge, stockLabel } from "@/components/mh/ui";
 import { Button } from "@/components/ui/button";
 import {
-  getProduct,
-  inr,
-  orderFlow,
-  products,
-  salesSeries,
-  vendorOrders,
-  vendors,
-  type Order,
-  type OrderStatus,
-  type Vendor,
-} from "@/lib/data";
-import { useStore } from "@/lib/store";
+  advanceVendorOrder,
+  getVendorDashboard,
+  type VendorDashboard,
+} from "@/lib/api/vendor";
+import { getProduct, salesSeries } from "@/lib/data";
+import { inrPaise } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 const views = ["overview", "orders", "products", "payouts"] as const;
@@ -58,37 +53,76 @@ const nav: DashNavItem[] = [
   { to: "/vendor", label: "Payouts", icon: Wallet, search: { view: "payouts" } },
 ];
 
+const COMMISSION_RATE = 0.08;
+
 /**
- * Which store the signed-in seller is managing.
+ * Loads the caller's own store from the server.
  *
- * Matches the session email against the seller records, falling back to the
- * first verified seller so the dashboard is explorable in a seeded demo. The
- * fallback is why nothing on this page may be treated as privileged: a real
- * build would resolve the vendor from a verified server-side session and refuse
- * to render anything if that lookup failed.
+ * This replaces `useMyVendor()`, which matched the session email against the
+ * seed array and then fell back to `vendors.find(v => v.verified)` when nothing
+ * matched — quietly showing a seller somebody else's dashboard. There is no
+ * fallback now: `getVendorDashboard` resolves the store by the session's user
+ * id and refuses if there is no link, and the refusal is surfaced rather than
+ * papered over.
  */
-function useMyVendor(): Vendor {
-  const { user } = useStore();
-  return useMemo(() => {
-    const email = (user?.email ?? "").trim().toLowerCase();
-    const byEmail = vendors.find((v) => v.email.toLowerCase() === email);
-    if (byEmail) return byEmail;
-    const byOwner = vendors.find((v) => v.owner.toLowerCase() === (user?.name ?? "").trim().toLowerCase());
-    if (byOwner) return byOwner;
-    return vendors.find((v) => v.verified) ?? vendors[0]!;
-  }, [user?.email, user?.name]);
+function useDashboard() {
+  const [data, setData] = useState<VendorDashboard | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    try {
+      setData(await getVendorDashboard());
+      setError("");
+    } catch (err) {
+      const raw = err instanceof Error ? err.message.trim() : "";
+      setError(raw && raw.length <= 200 ? raw : "Could not load your store.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { data, error, loading, reload };
 }
 
 function VendorPage() {
   const search = Route.useSearch();
   const view = search.view ?? "overview";
+  const { data, error, loading, reload } = useDashboard();
 
   return (
     <DashShell role="vendor" title="Vendor workspace" nav={nav}>
-      {view === "overview" && <Overview />}
-      {view === "orders" && <Orders />}
-      {view === "products" && <Listings />}
-      {view === "payouts" && <Payouts />}
+      {loading && (
+        <div className="grid min-h-[40vh] place-items-center" aria-busy="true">
+          <span className="text-sm text-muted-foreground">Loading your store…</span>
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="card-mh mx-auto mt-10 max-w-md p-8 text-center">
+          <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-warning-soft text-warning">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+          <h1 className="text-xl font-semibold">Store unavailable</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+          <Button asChild variant="outline" className="mt-6">
+            <Link to="/vendor-register">Check application status</Link>
+          </Button>
+        </div>
+      )}
+
+      {!loading && !error && data && (
+        <>
+          {view === "overview" && <Overview d={data} />}
+          {view === "orders" && <Orders d={data} onChanged={reload} />}
+          {view === "products" && <Listings d={data} />}
+          {view === "payouts" && <Payouts d={data} />}
+        </>
+      )}
     </DashShell>
   );
 }
@@ -102,7 +136,9 @@ function SalesChart() {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="font-semibold">Sales, last 6 months</h2>
-          <p className="text-sm text-muted-foreground">Gross merchandise value before commission.</p>
+          {/* Labelled as illustrative on purpose: this series is sample data
+              from lib/data.ts, not a query over this store's real orders. */}
+          <p className="text-sm text-muted-foreground">Illustrative trend — sample data, not your live orders.</p>
         </div>
         <span className="hidden text-sm font-semibold text-success sm:block">
           +18% vs previous period
@@ -116,7 +152,7 @@ function SalesChart() {
               className="w-full rounded-t-lg bg-brand/85 transition-all hover:bg-brand"
               style={{ height: `${Math.max(6, (s.sales / peak) * 100)}%` }}
               role="img"
-              aria-label={`${s.month}: ${inr(s.sales)} from ${s.orders} orders`}
+              aria-label={`${s.month}: ${s.sales} rupees from ${s.orders} orders`}
             />
             <span className="text-xs text-muted-foreground">{s.month}</span>
           </div>
@@ -126,13 +162,10 @@ function SalesChart() {
   );
 }
 
-function Overview() {
-  const vendor = useMyVendor();
-  const mine = products.filter((p) => p.vendorId === vendor.id);
-  const revenue = vendorOrders.filter((o) => o.status !== "Cancelled").reduce((s, o) => s + o.total, 0);
-  const live = vendorOrders.filter((o) => o.status !== "Delivered" && o.status !== "Cancelled");
-  const lowStock = mine.filter((p) => p.stock > 0 && p.stock < 10);
-  const outOfStock = mine.filter((p) => p.stock === 0);
+function Overview({ d }: { d: VendorDashboard }) {
+  const { vendor, products, orders, stats } = d;
+  const lowStock = products.filter((p) => p.stock > 0 && p.stock < 10);
+  const outOfStock = products.filter((p) => p.stock === 0);
 
   return (
     <>
@@ -150,9 +183,11 @@ function Overview() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Revenue" value={inr(revenue)} delta="+18%" icon={<TrendingUp />} />
-        <StatCard label="Open orders" value={String(live.length)} delta="+4%" icon={<ShoppingCart />} />
-        <StatCard label="Live listings" value={String(mine.length)} icon={<Package />} />
+        {/* Revenue is this store's share of its orders, computed server-side.
+            It never includes another seller's lines from a shared order. */}
+        <StatCard label="Revenue" value={inrPaise(stats.revenuePaise)} icon={<TrendingUp />} />
+        <StatCard label="Open orders" value={String(stats.openOrders)} icon={<ShoppingCart />} />
+        <StatCard label="Live listings" value={String(stats.liveListings)} icon={<Package />} />
         <StatCard label="Seller rating" value={vendor.rating > 0 ? `${vendor.rating}/5` : "Not rated"} icon={<Star />} />
       </div>
 
@@ -185,11 +220,14 @@ function Overview() {
             <Link to="/vendor" search={{ view: "orders" }} className="text-sm text-brand hover:underline">View all</Link>
           </div>
           <div className="mt-4 space-y-3">
-            {vendorOrders.slice(0, 5).map((o) => (
+            {orders.length === 0 && <p className="text-sm text-muted-foreground">No orders yet.</p>}
+            {orders.slice(0, 5).map((o) => (
               <div key={o.id} className="flex items-center justify-between gap-3 text-sm">
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.id}</div>
-                  <div className="text-xs text-muted-foreground">{o.date} · {inr(o.total)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {o.createdAt.slice(0, 10)} · {inrPaise(o.vendorSubtotalPaise)}
+                  </div>
                 </div>
                 <StatusBadge status={o.status} />
               </div>
@@ -201,16 +239,10 @@ function Overview() {
   );
 }
 
-const nextStatus = (s: OrderStatus): OrderStatus | null => {
-  const i = orderFlow.indexOf(s);
-  return i >= 0 && i < orderFlow.length - 1 ? orderFlow[i + 1]! : null;
-};
-
-function Orders() {
-  // Seeded seller orders are reference data in src/lib/data.ts, so status moves
-  // are held in local state rather than written back to the shared seed.
-  const [rows, setRows] = useState<Order[]>(vendorOrders);
+function Orders({ d, onChanged }: { d: VendorDashboard; onChanged: () => Promise<void> }) {
   const [filter, setFilter] = useState<"All" | "Open" | "Delivered" | "Cancelled">("All");
+  const [busy, setBusy] = useState<string | null>(null);
+  const rows = d.orders;
 
   const visible = rows.filter((o) =>
     filter === "All" ? true
@@ -219,21 +251,36 @@ function Orders() {
           : o.status !== "Delivered" && o.status !== "Cancelled",
   );
 
-  const advance = (id: string) => {
-    setRows((rs) =>
-      rs.map((o) => {
-        if (o.id !== id) return o;
-        const to = nextStatus(o.status);
-        if (!to) return o;
-        toast.success(`${id} moved to ${to}`);
-        return { ...o, status: to };
-      }),
-    );
+  /**
+   * Asks the server to move the order one step on.
+   *
+   * The destination is not sent — the server computes the next state from the
+   * current one, so skipping ahead to Delivered or reviving a cancelled order
+   * is not expressible. Previously this was local `useState` over the shared
+   * `vendorOrders` seed array and accepted any transition.
+   */
+  const advance = async (id: string) => {
+    if (busy) return;
+    setBusy(id);
+    try {
+      const updated = await advanceVendorOrder({ data: { orderId: id } });
+      toast.success(`${id} moved to ${updated.status}`);
+      await onChanged();
+    } catch (error) {
+      const raw = error instanceof Error ? error.message.trim() : "";
+      toast.error("Could not update order", {
+        description: raw && raw.length <= 200 ? raw : "Please try again.",
+      });
+    } finally {
+      setBusy(null);
+    }
   };
+
+  const isComplete = (s: string) => s === "Delivered";
 
   return (
     <>
-      <PageTitle title="Orders" sub={`${rows.length} orders placed with your store.`} />
+      <PageTitle title="Orders" sub={`${rows.length} order${rows.length === 1 ? "" : "s"} placed with your store.`} />
 
       <div className="mb-5 flex flex-wrap gap-2">
         {(["All", "Open", "Delivered", "Cancelled"] as const).map((f) => (
@@ -260,7 +307,7 @@ function Orders() {
               <tr>
                 <th className="px-5 py-3.5 font-semibold">Order</th>
                 <th className="px-5 py-3.5 font-semibold">Items</th>
-                <th className="px-5 py-3.5 font-semibold">Total</th>
+                <th className="px-5 py-3.5 font-semibold">Your total</th>
                 <th className="px-5 py-3.5 font-semibold">Payment</th>
                 <th className="px-5 py-3.5 font-semibold">Status</th>
                 <th className="px-5 py-3.5 font-semibold">Action</th>
@@ -268,32 +315,34 @@ function Orders() {
             </thead>
             <tbody className="divide-y divide-border">
               {visible.map((o) => {
-                const to = nextStatus(o.status);
-                const names = o.items
-                  .map((i) => getProduct(i.productId)?.name)
-                  .filter(Boolean)
-                  .join(", ");
+                const names = o.items.map((i) => i.name).join(", ");
                 return (
                   <tr key={o.id} className="transition hover:bg-surface/60">
                     <td className="px-5 py-4">
                       <div className="font-medium">{o.id}</div>
-                      {/* Ship-to city only. A seller needs the destination, not the
-                          shopper's full address, until the label is generated. */}
-                      <div className="text-xs text-muted-foreground">{o.date} · {o.address}</div>
+                      {/* Given name and destination city only. The server does
+                          not send the shopper's street address, PIN or phone to
+                          a seller at all, so there is nothing here to leak. */}
+                      <div className="text-xs text-muted-foreground">
+                        {o.createdAt.slice(0, 10)} · {o.customerName} · {o.shipCity}
+                      </div>
                     </td>
                     <td className="max-w-[220px] px-5 py-4 text-muted-foreground">
                       <span className="line-clamp-2">{names || "—"}</span>
                     </td>
-                    <td className="px-5 py-4 font-semibold">{inr(o.total)}</td>
+                    {/* This store's share, not the order's grand total. */}
+                    <td className="px-5 py-4 font-semibold">{inrPaise(o.vendorSubtotalPaise)}</td>
                     <td className="px-5 py-4"><StatusBadge status={o.payment} /></td>
                     <td className="px-5 py-4"><StatusBadge status={o.status} /></td>
                     <td className="px-5 py-4">
                       {o.status === "Cancelled" ? (
-                        <span className="text-xs text-muted-foreground">Refunded</span>
-                      ) : to ? (
-                        <Button size="sm" variant="outline" onClick={() => advance(o.id)}>Mark {to}</Button>
-                      ) : (
+                        <span className="text-xs text-muted-foreground">Cancelled</span>
+                      ) : isComplete(o.status) ? (
                         <span className="text-xs text-muted-foreground">Complete</span>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => advance(o.id)}>
+                          {busy === o.id ? "Updating…" : "Advance"}
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -307,16 +356,15 @@ function Orders() {
   );
 }
 
-function Listings() {
-  const vendor = useMyVendor();
-  const mine = products.filter((p) => p.vendorId === vendor.id);
+function Listings({ d }: { d: VendorDashboard }) {
+  const mine = d.products;
 
   return (
     <>
       <PageTitle
         title="Listings"
-        sub={`${mine.length} live product${mine.length === 1 ? "" : "s"} in your store.`}
-        action={<Button variant="brand" onClick={() => toast("Listing editor needs a backend", { description: "Creating products requires a catalogue API, which this build does not have." })}>Add product</Button>}
+        sub={`${mine.length} product${mine.length === 1 ? "" : "s"} in your store.`}
+        action={<Button variant="brand" onClick={() => toast("Listing editor not built yet", { description: "Creating products needs a catalogue write API, which is not part of this build." })}>Add product</Button>}
       />
 
       {mine.length === 0 ? (
@@ -340,27 +388,31 @@ function Listings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {mine.map((p) => (
-                <tr key={p.id} className="transition hover:bg-surface/60">
-                  <td className="px-5 py-4">
-                    <Link to="/product/$id" params={{ id: p.id }} className="flex items-center gap-3 hover:text-brand">
-                      <img src={p.image} alt="" className="h-11 w-11 rounded-xl object-cover" />
-                      <span className="line-clamp-2 max-w-[220px] font-medium">{p.name}</span>
-                    </Link>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs text-muted-foreground">{p.sku}</td>
-                  <td className="px-5 py-4">
-                    <div className="font-semibold">{inr(p.price)}</div>
-                    {p.originalPrice && <div className="text-xs text-muted-foreground line-through">{inr(p.originalPrice)}</div>}
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="font-medium">{p.stock}</div>
-                    <StatusBadge status={stockLabel(p.stock)} />
-                  </td>
-                  <td className="px-5 py-4">★ {p.rating} <span className="text-xs text-muted-foreground">({p.reviews})</span></td>
-                  <td className="px-5 py-4"><StatusBadge status={p.status} /></td>
-                </tr>
-              ))}
+              {mine.map((p) => {
+                // Imagery stays a client asset import; only the data moved server-side.
+                const art = getProduct(p.id);
+                return (
+                  <tr key={p.id} className="transition hover:bg-surface/60">
+                    <td className="px-5 py-4">
+                      <Link to="/product/$id" params={{ id: p.id }} className="flex items-center gap-3 hover:text-brand">
+                        {art && <img src={art.image} alt="" className="h-11 w-11 rounded-xl object-cover" />}
+                        <span className="line-clamp-2 max-w-[220px] font-medium">{p.name}</span>
+                      </Link>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs text-muted-foreground">{p.sku}</td>
+                    <td className="px-5 py-4">
+                      <div className="font-semibold">{inrPaise(p.pricePaise)}</div>
+                      {p.originalPricePaise && <div className="text-xs text-muted-foreground line-through">{inrPaise(p.originalPricePaise)}</div>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-medium">{p.stock}</div>
+                      <StatusBadge status={stockLabel(p.stock)} />
+                    </td>
+                    <td className="px-5 py-4">★ {p.rating} <span className="text-xs text-muted-foreground">({p.reviews})</span></td>
+                    <td className="px-5 py-4"><StatusBadge status={p.status} /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -369,21 +421,18 @@ function Listings() {
   );
 }
 
-function Payouts() {
-  const settled = vendorOrders.filter((o) => o.status === "Delivered");
-  const pending = vendorOrders.filter((o) => o.status !== "Delivered" && o.status !== "Cancelled");
-  const gross = settled.reduce((s, o) => s + o.total, 0);
-  const commission = Math.round(gross * 0.08);
-  const inFlight = pending.reduce((s, o) => s + o.total, 0);
+function Payouts({ d }: { d: VendorDashboard }) {
+  const settled = d.orders.filter((o) => o.status === "Delivered");
+  const { settledPaise, commissionPaise, inFlightPaise } = d.stats;
 
   return (
     <>
       <PageTitle title="Payouts" sub="Settled after the buyer's 7-day return window closes." />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Ready to pay out" value={inr(gross - commission)} icon={<Banknote />} />
-        <StatCard label="Commission (8%)" value={inr(commission)} icon={<Wallet />} />
-        <StatCard label="Pending delivery" value={inr(inFlight)} icon={<ShoppingCart />} />
+        <StatCard label="Ready to pay out" value={inrPaise(settledPaise - commissionPaise)} icon={<Banknote />} />
+        <StatCard label="Commission (8%)" value={inrPaise(commissionPaise)} icon={<Wallet />} />
+        <StatCard label="Pending delivery" value={inrPaise(inFlightPaise)} icon={<ShoppingCart />} />
       </div>
 
       <div className="card-mh mt-4 p-6">
@@ -422,14 +471,14 @@ function Payouts() {
             </thead>
             <tbody className="divide-y divide-border">
               {settled.map((o) => {
-                const fee = Math.round(o.total * 0.08);
+                const fee = Math.round(o.vendorSubtotalPaise * COMMISSION_RATE);
                 return (
                   <tr key={o.id}>
                     <td className="px-5 py-4 font-medium">{o.id}</td>
                     <td className="px-5 py-4 text-muted-foreground">{o.eta}</td>
-                    <td className="px-5 py-4">{inr(o.total)}</td>
-                    <td className="px-5 py-4 text-muted-foreground">−{inr(fee)}</td>
-                    <td className="px-5 py-4 font-semibold">{inr(o.total - fee)}</td>
+                    <td className="px-5 py-4">{inrPaise(o.vendorSubtotalPaise)}</td>
+                    <td className="px-5 py-4 text-muted-foreground">−{inrPaise(fee)}</td>
+                    <td className="px-5 py-4 font-semibold">{inrPaise(o.vendorSubtotalPaise - fee)}</td>
                   </tr>
                 );
               })}

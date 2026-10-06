@@ -1,5 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { seedOrders, type Order } from "./data";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { logout as logoutFn, me } from "@/lib/api/auth";
+import { listMyOrders } from "@/lib/api/orders";
+import type { OrderDto } from "@/lib/server/dto";
+import { type Order } from "./data";
 
 export type Role = "customer" | "vendor" | "admin";
 export type User = { name: string; email: string; role: Role; phone?: string };
@@ -18,8 +21,9 @@ export type Address = {
 
 type Store = {
   user: User | null;
-  login: (u: User) => void;
-  logout: () => void;
+  /** Re-reads the session from the server. Call after sign-in or sign-out. */
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => void;
   addresses: Address[];
   saveAddress: (a: Address) => void;
@@ -33,61 +37,136 @@ type Store = {
   clearCart: () => void;
   wishlist: string[];
   toggleWish: (id: string) => void;
+  /** Server-owned. Never written locally. */
   orders: Order[];
-  addOrder: (o: Order) => void;
-  updateOrder: (id: string, patch: Partial<Order>) => void;
-  /** Ids of notifications already seen. Notices themselves are derived, not stored. */
+  refreshOrders: () => Promise<void>;
   readNotices: string[];
   markNoticesRead: (ids: string[]) => void;
   hydrated: boolean;
 };
 
 const Ctx = createContext<Store | null>(null);
-const KEY = "markethub-state-v1";
+
+/**
+ * Bumped from -v1 to -v2 deliberately.
+ *
+ * The v1 payload contained `user` and `orders`, which are now server-owned. A
+ * stale v1 blob would otherwise rehydrate a forged session object — the exact
+ * privilege-escalation path this change exists to close — so the old key is
+ * abandoned rather than migrated.
+ */
+const KEY = "markethub-state-v2";
+const LEGACY_KEYS = ["markethub-state-v1"];
+
+/**
+ * Server orders arrive as integer paise in a flat DTO. The rest of the app was
+ * written against the `Order` shape in lib/data.ts and reads rupees, so the
+ * conversion happens here, once, instead of touching every consumer.
+ */
+function toOrder(dto: OrderDto): Order {
+  return {
+    id: dto.id,
+    date: dto.createdAt.slice(0, 10),
+    customer: dto.shipTo.name,
+    items: dto.items.map((i) => ({
+      productId: i.productId,
+      qty: i.qty,
+      price: i.unitPricePaise / 100,
+    })),
+    total: dto.totalPaise / 100,
+    status: dto.status as Order["status"],
+    payment: dto.payment as Order["payment"],
+    method: dto.method,
+    eta: dto.eta,
+    address: `${dto.shipTo.line}, ${dto.shipTo.city} ${dto.shipTo.pin}`.trim(),
+  };
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
-  const [orders, setOrders] = useState<Order[]>(seedOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [readNotices, setReadNotices] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
+  const refreshOrders = useCallback(async () => {
+    try {
+      const list = await listMyOrders();
+      setOrders(list.map(toOrder));
+    } catch {
+      // Signed out, or the request failed. Either way an empty history is the
+      // honest answer; it must never fall back to the seed array, which would
+      // show one shopper another shopper's orders.
+      setOrders([]);
+    }
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const current = await me();
+      setUser(
+        current
+          ? { name: current.name, email: current.email, role: current.role, phone: current.phone ?? undefined }
+          : null,
+      );
+      if (current) await refreshOrders();
+      else setOrders([]);
+    } catch {
+      setUser(null);
+      setOrders([]);
+    }
+  }, [refreshOrders]);
+
+  // Local-only slices. Cart, wishlist and the address book stay in the browser
+  // for now (persisting them server-side is the next step); none of them is
+  // trusted at checkout, which re-reads every price and total from the store.
   useEffect(() => {
     try {
+      for (const stale of LEGACY_KEYS) localStorage.removeItem(stale);
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const s = JSON.parse(raw);
-        setUser(s.user ?? null);
         setAddresses(s.addresses ?? []);
         setCart(s.cart ?? []);
         setWishlist(s.wishlist ?? []);
-        setOrders(s.orders ?? seedOrders);
         setReadNotices(s.readNotices ?? []);
       }
     } catch {}
-    setHydrated(true);
-  }, []);
+
+    // The session is the server's answer, not a localStorage value.
+    void refreshUser().finally(() => setHydrated(true));
+  }, [refreshUser]);
 
   useEffect(() => {
     if (hydrated) {
-      localStorage.setItem(KEY, JSON.stringify({ user, addresses, cart, wishlist, orders, readNotices }));
+      localStorage.setItem(KEY, JSON.stringify({ addresses, cart, wishlist, readNotices }));
     }
-  }, [hydrated, user, addresses, cart, wishlist, orders, readNotices]);
+  }, [hydrated, addresses, cart, wishlist, readNotices]);
 
   const value: Store = {
     user,
     hydrated,
-    login: setUser,
-    // Clearing addresses on logout as well: they are postal addresses and phone
-    // numbers sitting in localStorage on what may be a shared machine, so
+    refreshUser,
+    // Clearing addresses on sign-out as well: they are postal addresses and
+    // phone numbers sitting in localStorage on what may be a shared machine, so
     // "log out" should mean the next person sees nothing.
-    logout: () => {
+    logout: async () => {
+      try {
+        await logoutFn();
+      } catch {
+        // The cookie is cleared server-side on success; on failure we still drop
+        // local state so the UI cannot keep showing a signed-in shell.
+      }
       setUser(null);
       setAddresses([]);
+      setOrders([]);
     },
-    updateUser: (patch) => setUser((u) => (u ? { ...u, ...patch } : u)),
+    // Local display patch only. `role` is intentionally not patchable here —
+    // it is whatever the server last said it was.
+    updateUser: (patch) =>
+      setUser((u) => (u ? { ...u, name: patch.name ?? u.name, phone: patch.phone ?? u.phone } : u)),
     addresses,
     saveAddress: (a) =>
       setAddresses((list) => {
@@ -120,8 +199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     wishlist,
     toggleWish: (id) => setWishlist((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id])),
     orders,
-    addOrder: (o) => setOrders((os) => [o, ...os]),
-    updateOrder: (id, patch) => setOrders((os) => os.map((o) => (o.id === id ? { ...o, ...patch } : o))),
+    refreshOrders,
     readNotices,
     markNoticesRead: (ids) => setReadNotices((r) => [...new Set([...r, ...ids])]),
   };
