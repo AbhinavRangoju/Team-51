@@ -1,0 +1,344 @@
+import { __toESM } from "../_runtime.mjs";
+import { categories, p_serum_default, p_sneaker_default, p_vase_default, products, vendors } from "./data-B5ji5bfz.mjs";
+import { require_react } from "../_libs/@floating-ui/react-dom+[...].mjs";
+import { require_jsx_runtime } from "../_libs/@radix-ui/react-collection+[...].mjs";
+import { Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { toast } from "../_libs/sonner.mjs";
+import { ArrowRight, BadgeCheck, ShieldCheck, Truck } from "../_libs/lucide-react.mjs";
+import { SectionHeader } from "./ui-JZvfr52Y.mjs";
+import { ProductCard } from "./ProductCard-CQ7_OnWg.mjs";
+import { Button } from "./button-B2WEFLZt.mjs";
+import { StoreLayout } from "./StoreLayout-BkQggy5A.mjs";
+import { hero_default } from "./hero-DYk0bSyM.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-IB7-y5eJ.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function Rail({ tag, eyebrow, title }) {
+	const list = products.filter((p) => p.tags.includes(tag)).slice(0, 4);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "container-mh mt-20",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionHeader, {
+			eyebrow,
+			title,
+			action: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+				to: "/shop",
+				className: "flex items-center gap-1 text-sm font-semibold hover:text-brand",
+				children: ["View all ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "h-4 w-4" })]
+			})
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "grid grid-cols-2 gap-x-4 gap-y-8 md:gap-x-6 lg:grid-cols-4",
+			children: list.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProductCard, { product: p }, p.id))
+		})]
+	});
+}
+function Index() {
+	const [email, setEmail] = (0, import_react.useState)("");
+	const promos = [
+		{
+			title: "Big Deals",
+			sub: "Up to 40% off top-rated picks",
+			img: p_sneaker_default,
+			to: "/deals",
+			dark: true
+		},
+		{
+			title: "New Arrivals",
+			sub: "Fresh drops this week",
+			img: p_vase_default,
+			to: "/shop",
+			dark: false
+		},
+		{
+			title: "Vendor Specials",
+			sub: "Exclusive from indie makers",
+			img: p_serum_default,
+			to: "/vendors",
+			dark: false
+		}
+	];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(StoreLayout, { children: [
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+			className: "container-mh pt-6",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative overflow-hidden rounded-[2rem] bg-surface",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+						src: hero_default,
+						alt: "Shopper carrying MarketHub bags",
+						width: 1600,
+						height: 1008,
+						className: "absolute inset-0 h-full w-full object-cover object-[70%_center]"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-transparent md:via-background/40" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "relative flex min-h-[520px] max-w-xl flex-col justify-center px-6 py-14 md:min-h-[600px] md:px-14",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "mb-5 inline-flex w-fit items-center gap-2 rounded-full bg-card px-3 py-1.5 text-xs font-semibold shadow-card",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-2 w-2 rounded-full bg-brand" }), " 6,200+ verified sellers"]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h1", {
+								className: "text-4xl font-semibold leading-[1.05] md:text-6xl",
+								children: ["Everything you want. ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-brand",
+									children: "From sellers you trust."
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-5 max-w-md text-base text-muted-foreground md:text-lg",
+								children: "One cart for independent brands across fashion, tech, home and more — with protected payments on every order."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mt-8 flex flex-wrap gap-3",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+									asChild: true,
+									variant: "brand",
+									size: "lg",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+										to: "/shop",
+										children: ["Shop Now ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, {})]
+									})
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+									asChild: true,
+									variant: "outline",
+									size: "lg",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+										to: "/categories",
+										children: "Explore Categories"
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "flex items-center gap-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "h-4 w-4 text-brand" }), "Secure checkout"]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "flex items-center gap-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(BadgeCheck, { className: "h-4 w-4 text-brand" }), "Verified vendors"]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "flex items-center gap-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Truck, { className: "h-4 w-4 text-brand" }), "Fast delivery"]
+									})
+								]
+							})
+						]
+					})
+				]
+			})
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+			className: "container-mh mt-16",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionHeader, {
+				eyebrow: "Browse",
+				title: "Shop by category"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "-mx-4 flex gap-5 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-8 md:px-0",
+				children: categories.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+					to: "/shop",
+					search: { cat: c.slug },
+					className: "group flex w-24 shrink-0 flex-col items-center text-center md:w-auto",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "aspect-square w-full overflow-hidden rounded-full border border-border bg-surface transition group-hover:border-brand group-hover:shadow-lift",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: c.image,
+								alt: "",
+								loading: "lazy",
+								className: "h-full w-full object-cover transition duration-500 group-hover:scale-110"
+							})
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mt-3 text-sm font-semibold",
+							children: c.name
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "text-xs text-muted-foreground",
+							children: [c.count.toLocaleString("en-IN"), " items"]
+						})
+					]
+				}, c.slug))
+			})]
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+			className: "container-mh mt-16 grid gap-4 md:grid-cols-3",
+			children: promos.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+				to: p.to,
+				className: `group relative flex h-56 overflow-hidden rounded-3xl p-7 ${p.dark ? "bg-primary text-primary-foreground" : "bg-surface"}`,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "relative z-10 flex flex-col",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							className: "text-2xl font-semibold",
+							children: p.title
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: `mt-1 max-w-[12rem] text-sm ${p.dark ? "text-primary-foreground/70" : "text-muted-foreground"}`,
+							children: p.sub
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "mt-auto flex items-center gap-1 text-sm font-semibold",
+							children: ["Shop now ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "h-4 w-4 transition group-hover:translate-x-1" })]
+						})
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+					src: p.img,
+					alt: "",
+					loading: "lazy",
+					className: "absolute -bottom-6 -right-6 h-52 w-52 rounded-full object-cover transition duration-500 group-hover:scale-105"
+				})]
+			}, p.title))
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Rail, {
+			tag: "trending",
+			eyebrow: "Right now",
+			title: "Trending products"
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Rail, {
+			tag: "new",
+			eyebrow: "Just landed",
+			title: "New arrivals"
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+			className: "container-mh mt-20",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "grid items-center gap-8 rounded-[2rem] bg-primary p-8 text-primary-foreground md:grid-cols-2 md:p-14",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs font-semibold uppercase tracking-[0.14em] text-brand",
+						children: "Deals of the week"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "mt-2 text-3xl font-semibold md:text-4xl",
+						children: "Festive Week. Prices drop daily at noon."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3 text-primary-foreground/70",
+						children: "Hand-picked offers from top-rated vendors, ending Sunday."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+						asChild: true,
+						variant: "brand",
+						size: "lg",
+						className: "mt-7",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+							to: "/deals",
+							children: "See all deals"
+						})
+					})
+				] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "grid grid-cols-3 gap-3",
+					children: [
+						["02", "Days"],
+						["14", "Hours"],
+						["36", "Mins"]
+					].map(([n, l]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "rounded-2xl bg-primary-foreground/10 p-5 text-center",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "font-display text-4xl font-semibold",
+							children: n
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mt-1 text-xs text-primary-foreground/60",
+							children: l
+						})]
+					}, l))
+				})]
+			})
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Rail, {
+			tag: "best",
+			eyebrow: "Loved by shoppers",
+			title: "Best sellers"
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+			className: "container-mh mt-20",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionHeader, {
+				eyebrow: "Meet the makers",
+				title: "Featured vendors",
+				action: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+					to: "/vendors",
+					className: "flex items-center gap-1 text-sm font-semibold hover:text-brand",
+					children: ["All vendors ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "h-4 w-4" })]
+				})
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "grid gap-4 sm:grid-cols-2 lg:grid-cols-4",
+				children: vendors.filter((v) => v.verified).slice(0, 4).map((v) => {
+					const sample = products.filter((p) => p.vendorId === v.id).slice(0, 3);
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+						to: "/vendors",
+						className: "card-mh p-5 transition hover:-translate-y-0.5 hover:shadow-lift",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex items-center gap-3",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "grid h-11 w-11 place-items-center rounded-full bg-surface font-display font-semibold",
+								children: v.name[0]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "flex items-center gap-1 font-semibold",
+								children: [v.name, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BadgeCheck, { className: "h-4 w-4 text-brand" })]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "text-xs text-muted-foreground",
+								children: [
+									"★ ",
+									v.rating,
+									" · ",
+									v.products,
+									" products"
+								]
+							})] })]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mt-4 grid grid-cols-3 gap-2",
+							children: sample.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: p.image,
+								alt: "",
+								loading: "lazy",
+								className: "aspect-square rounded-xl object-cover"
+							}, p.id))
+						})]
+					}, v.id);
+				})
+			})]
+		}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+			className: "container-mh mt-20",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-col items-center rounded-[2rem] border border-border bg-card px-6 py-14 text-center",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-3xl font-semibold",
+						children: "Get first dibs on drops & deals"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-2 max-w-md text-muted-foreground",
+						children: "One email a week. New vendors, price drops, and nothing else."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+						className: "mt-7 flex w-full max-w-md gap-2",
+						onSubmit: (e) => {
+							e.preventDefault();
+							if (!/^\S+@\S+\.\S+$/.test(email)) return toast.error("Please enter a valid email");
+							toast.success("You're on the list!");
+							setEmail("");
+						},
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							value: email,
+							onChange: (e) => setEmail(e.target.value),
+							placeholder: "you@example.com",
+							"aria-label": "Email",
+							className: "h-12 flex-1 rounded-full border border-input bg-background px-5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/10"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							variant: "default",
+							size: "lg",
+							type: "submit",
+							children: "Subscribe"
+						})]
+					})
+				]
+			})
+		})
+	] });
+}
+//#endregion
+export { Index as component };

@@ -1,0 +1,112 @@
+import { require_jsx_runtime } from "../_libs/@radix-ui/react-collection+[...].mjs";
+import { Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { FileText, Info } from "../_libs/lucide-react.mjs";
+import { LEGAL_PAGES, StoreLayout } from "./StoreLayout-BkQggy5A.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/LegalPage-Bxwl6sC3.js
+var import_jsx_runtime = require_jsx_runtime();
+/** Shared prose styles — there is no typography plugin in this project. */
+var prose = "space-y-3 text-sm leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground";
+var bullets = "ml-5 list-disc space-y-2 text-sm leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground";
+function SiblingLinks({ current }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", {
+		"aria-label": "Other policies",
+		className: "space-y-1.5",
+		children: LEGAL_PAGES.filter((p) => p.to !== current).map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+			to: p.to,
+			className: "flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface hover:text-foreground",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileText, { className: "h-4 w-4 shrink-0" }), p.label]
+		}, p.to))
+	});
+}
+function LegalPage({ title, summary, updated, current, sections }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StoreLayout, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "container-mh pt-8",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", {
+				className: "text-xs text-muted-foreground",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/",
+						className: "hover:text-foreground",
+						children: "Home"
+					}),
+					" / ",
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "text-foreground",
+						children: title
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "mt-4 max-w-3xl",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+						className: "text-3xl font-semibold md:text-4xl",
+						children: title
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3 text-muted-foreground",
+						children: summary
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "mt-4 text-xs text-muted-foreground",
+						children: ["Last updated ", updated]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "card-mh mt-7 flex max-w-3xl items-start gap-3 border-info/40 bg-info-soft/30 p-5",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Info, { className: "mt-0.5 h-5 w-5 shrink-0 text-info" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "text-sm text-muted-foreground",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+							className: "font-semibold text-foreground",
+							children: "This is a demonstration document."
+						}),
+						" ",
+						"MarketHub is a project build, not a registered business. These pages describe how the product is designed to behave and are written to match what the application actually does — they are not legal advice and create no binding obligation."
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-10 grid gap-10 pb-10 lg:grid-cols-[1fr_260px]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("article", {
+					className: "max-w-3xl space-y-10",
+					children: sections.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						id: s.id,
+						className: "scroll-mt-24",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "mb-3 text-xl font-semibold",
+							children: s.heading
+						}), s.body]
+					}, s.id))
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+					className: "space-y-5 lg:sticky lg:top-24 lg:self-start",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "card-mh p-5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "mb-3 text-sm font-semibold",
+							children: "On this page"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", {
+							"aria-label": "Sections",
+							className: "space-y-1.5",
+							children: sections.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+								href: `#${s.id}`,
+								className: "block rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-surface hover:text-foreground",
+								children: s.heading
+							}, s.id))
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "card-mh p-5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "mb-3 text-sm font-semibold",
+							children: "Other policies"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SiblingLinks, { current })]
+					})]
+				})]
+			})
+		]
+	}) });
+}
+//#endregion
+export { LegalPage, bullets, prose };
