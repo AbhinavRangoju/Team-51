@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Mail, User, Loader2, Check, ShoppingBag, Info, TriangleAlert } from "lucide-react";
 import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { login as loginFn, signup as signupFn, type PublicUser } from "@/lib/api/auth";
+import { postLoginPath } from "@/lib/onboarding-store";
 import { useStore } from "@/lib/store";
 
 export type AuthMode = "login" | "signup";
@@ -149,7 +150,13 @@ function useLandAfterAuth(redirect: string) {
   return async (user: PublicUser) => {
     await refreshUser();
     const fallback = user.role === "vendor" ? "/vendor" : "/";
-    const to = redirect || fallback;
+    // First-run onboarding is a gate, so it outranks both the RequireAuth deep
+    // link and the role landing page. postLoginPath() only answers
+    // "/onboarding" while that run is still outstanding; once it is finished,
+    // the server-derived destination above applies unchanged. The flag lives in
+    // localStorage, so this is per-browser and never a source of authority —
+    // the role itself still comes only from the server.
+    const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
     // Let the success state render for a beat before leaving the page.
     setTimeout(() => navigate({ to, replace: true }), 600);
   };

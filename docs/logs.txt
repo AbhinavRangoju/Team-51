@@ -1619,6 +1619,471 @@ Actions Taken:
 * (push recorded below)
 
 ================================================================================
+[2026-10-05T21:42:10+05:30] Branch sync check — PR #1 merged, Frontend now 2 behind main
+================================================================================
+User Prompt (verbatim):
+is our branch up to date
+
+Agent Response:
+Fetched and compared. Two answers, because "up to date" splits two ways here.
+
+1. Frontend vs its own remote: IN SYNC.
+   local Frontend  = cacb0f2
+   origin/Frontend = cacb0f2
+   `git status -sb` shows "## Frontend...origin/Frontend" with no ahead/behind
+   markers. Working tree clean. Nothing unpushed.
+
+2. Frontend vs main: 2 COMMITS BEHIND, 0 ahead.
+   `git rev-list --left-right --count origin/main...Frontend` -> 2  0
+
+PR #1 WAS CREATED AND MERGED since the last turn. origin/main is now:
+   bfd7b69  Merge pull request #1 from AbhinavRangoju/Frontend
+The two commits Frontend lacks are that merge commit and 78eeab3 "Security
+Architecture". Being 0 ahead means nothing we built is missing from main — the
+whole Frontend line is in.
+
+Merge outcome verified on origin/main:
+   128 tracked files total, 109 under src/  (was 12 files / 1 placeholder)
+   SECURITY_ARCHITECTURE.md present — teammate's doc preserved as intended
+   metadata/team.yaml contains "Trishul" — filled metadata carried over
+So main is now the complete picture: the app, the security doc, and the real
+submission metadata.
+
+NEW BRANCH DISCOVERED — origin/backend @ 2bdd463 ("2st commit"), NOT merged into
+main (`git merge-base --is-ancestor origin/backend origin/main` -> exit 1). It
+carries 4 commits off the seed: 04e85a9 "1st commit", c4bd7c3 "log: onboarding
+turn 1 - MarketHub role spec request", 9180489 and 2bdd463 both "2st commit".
+A teammate is building a backend. This is directly relevant to the doc-vs-code
+gap flagged in the two previous turns: SECURITY_ARCHITECTURE.md assumes a
+server-authoritative backend, and someone is now actually writing one. Whether
+that backend replaces the client-only localStorage model in src/ needs a team
+decision before the deadline — the two cannot both be the submission's story.
+
+Recommended next step (NOT taken, awaiting the user): merge origin/main into
+Frontend so the branch stops diverging and picks up SECURITY_ARCHITECTURE.md.
+That is a local, reversible, conflict-free operation, but it changes the branch
+and would need a push to share, so left for explicit instruction.
+
+Agent Response Summary:
+Read-only sync check. Frontend is fully pushed and identical to origin/Frontend,
+but sits 2 commits behind origin/main because PR #1 was merged — main now holds
+128 files including all 109 src/ files, the teammate's security doc and the
+filled metadata. Also found an unmerged origin/backend branch with a teammate's
+backend work, which sharpens the existing doc-vs-implementation question. No
+repo state changed beyond this log entry.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git fetch origin --prune
+* git status -sb; git rev-parse Frontend origin/Frontend
+* git rev-list --left-right --count origin/main...Frontend  -> 2 behind, 0 ahead
+* git log --oneline origin/main --not Frontend  -> bfd7b69, 78eeab3
+* git log origin/main --oneline --graph  -> confirmed PR #1 merge commit
+* git branch -r -v  -> found origin/backend
+* git merge-base --is-ancestor origin/backend origin/main  -> not merged
+* Verified file counts and SECURITY_ARCHITECTURE.md / team.yaml on origin/main
+
+================================================================================
+[2026-10-05T21:52:00+05:30] Merge origin/main into Frontend and push
+================================================================================
+User Prompt (verbatim):
+go with it
+
+Agent Response:
+Merged origin/main into Frontend and pushed. Frontend is no longer behind main.
+
+Pre-merge state: tree CLEAN, Frontend 2 behind / 1 ahead of origin/main (the 1
+ahead being the previous turn's log commit, so a fast-forward was not possible).
+`git merge-tree --write-tree origin/main Frontend` previewed tree 432d6f7 with 0
+conflicts. Recorded rollback point aa09fd8 before touching anything.
+
+Merge: `git merge origin/main --no-edit`. Result — "Merge made by the 'ort'
+strategy", ONE file changed:
+  A  SECURITY_ARCHITECTURE.md  (+834)
+Merge commit: 11982bd
+
+Verification that the merge was purely additive:
+* `git diff --name-status aa09fd8 HEAD` -> a single line, A SECURITY_ARCHITECTURE.md
+* `git diff --name-only aa09fd8 HEAD -- src/` -> 0 files. No application code moved.
+* SECURITY_ARCHITECTURE.md present on disk.
+* npm test -> 1/1 passing
+* npm run typecheck -> 11 real errors, IDENTICAL to the pre-merge baseline
+  (chart.tsx 10, calendar.tsx 1 — the two unused shadcn wrappers). No new errors.
+* npm run build -> clean from a deleted .output: server entry present, 65 client
+  assets emitted.
+
+Post-merge: Frontend is 0 behind / 2 ahead of origin/main. The 2 ahead are the
+merge commit 11982bd and the prior log commit aa09fd8; main already contains
+everything else.
+
+TWO FALSE ALARMS during this turn, both mine, both resolved — recording so the
+record is accurate rather than tidy:
+
+1. "The build failed." A build invoked in a parallel tool call and a second
+   build invoked immediately after raced on the .output directory, and one died
+   with a buildApp stack trace. Not caused by the merge. Re-ran a single
+   isolated build after deleting .output: exit 0, artifacts present. The lesson
+   is not to run two vite builds concurrently against the same output dir.
+
+2. "The push did not land." The first `git push origin Frontend` succeeded but
+   PowerShell swallowed its output, and the follow-up `git rev-parse
+   origin/Frontend` in a compound command read a stale remote-tracking ref,
+   showing cacb0f2 and "[ahead 4]". A second push reported "Everything
+   up-to-date", which contradicted that. Settled it by querying the server
+   directly: `git ls-remote origin refs/heads/Frontend` -> 11982bd, equal to
+   local. The push had worked all along; the local tracking ref was stale.
+   `git remote update origin` then showed "## Frontend...origin/Frontend" with
+   no ahead/behind.
+
+Final: local Frontend = origin/Frontend = 11982bd (before this log commit).
+
+Reiterated for the team, now sharper than before: there are three accounts of
+what MarketHub is — SECURITY_ARCHITECTURE.md's server-authoritative design (now
+merged into Frontend), the client-only localStorage app in src/, and a teammate's
+unmerged origin/backend branch. Only one can be the submission's story.
+
+Agent Response Summary:
+Merged origin/main into Frontend: one file added, SECURITY_ARCHITECTURE.md, with
+zero changes under src/, tests still 1/1, typecheck still at its 11-error
+baseline and a clean build from scratch. Pushed; local and remote Frontend both
+at merge commit 11982bd, 0 behind main. Two scares along the way — a build failure
+and an apparently-lost push — were both artefacts of my own tooling (concurrent
+builds, a stale tracking ref) and not real problems; verified and documented.
+
+Commit SHA:
+(recorded in the COMMIT RECORD block below)
+
+Files Modified / Created:
+* SECURITY_ARCHITECTURE.md (Added by merge — teammate-authored, not written by me)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* git fetch origin --prune; confirmed clean tree and 2-behind/1-ahead
+* git merge-tree --write-tree origin/main Frontend -> 0 conflicts
+* Recorded rollback point aa09fd8
+* git merge origin/main --no-edit -> merge commit 11982bd
+* git diff aa09fd8 HEAD (and scoped to src/) to prove the merge was additive
+* npm test 1/1; npm run typecheck 11 (unchanged); npm run build clean from empty .output
+* git push origin Frontend
+* git ls-remote origin refs/heads/Frontend to settle the stale-ref confusion
+* git remote update origin --prune; git status -sb -> in sync
+* Deleted temporary build-err.txt, build2.txt, push.txt
+
+================================================================================
+[2026-10-06T10:58:57+05:30] SESSION START
+================================================================================
+Agent: Kiro (Claude Opus 5)
+Repo Root: c:\Users\manik\OneDrive\Desktop\Team-51
+Branch: Frontend
+System Time: 2026-10-06T10:58:57+05:30
+Deadline: 2026-10-06T11:00:00+05:30
+
+================================================================================
+[2026-10-06T11:06:40+05:30] Integrate participant-authored onboarding flow at /onboarding
+================================================================================
+User Prompt (verbatim):
+I have code for onboarding so i will hand it over and you add it to the page, Do not change anything just make sure that the code i sent is integrated properly in the project. On focus on this task and not on time limits or hackathon.
+
+onboarding.tsx
+[full source for src/routes/onboarding.tsx, src/components/onboarding/slides.ts,
+src/lib/onboarding-store.ts, src/components/onboarding/Illustrations.tsx,
+src/components/onboarding/Onboarding.tsx, and the "Onboarding CSS Classes"
+block for src/styles.css — pasted inline by the participant]
+
+Agent Response:
+Integrated the five handed-over files verbatim plus the CSS block, with no design,
+copy, or logic changes. Placement follows existing project conventions: the route
+in src/routes/ (file-based routing, so routeTree.gen.ts regenerated itself on
+build), the three onboarding components in a new src/components/onboarding/
+folder alongside the existing src/components/auth/ and src/components/mh/, and
+the device-local state helper in src/lib/ next to store.ts.
+
+Two corrections were required for the code to compile — both restore the author's
+evident intent rather than alter it. The paste had lost the opening brace of every
+JSX attribute holding a template literal, e.g. `transform=`translate(${x} ${y})`}`
+instead of `transform={`translate(${x} ${y})`}`. Repaired 13 such attributes
+across Illustrations.tsx (Float, Stars, Check, Compare filter chips, Store awning,
+Products rows, Orders milestones, RoleIcon awning) and Onboarding.tsx
+(ProgressIndicator aria-label, Btn className, RoleSelectionCard icon wrapper,
+textarea className, container key and className).
+
+Two Tailwind theme tokens were missing from the project, so two classes the code
+relies on would have compiled to nothing. `bg-ink` (the dark logo badge on the
+role step and in the header) had no backing --color-ink, and `animate-fade-in`
+(inline field-validation errors in VendorSetupForm) had no backing animation.
+Registered --color-ink: var(--mob-ink) and --animate-fade-in: ob-fade-in 0.2s both
+in the existing @theme inline block, and added the matching @keyframes ob-fade-in
+next to the author's onboarding keyframes. Verified in the compiled bundle:
+.bg-ink{background-color:var(--mob-ink)} and
+.animate-fade-in{animation:.2s both ob-fade-in}.
+
+Every other class in the handed-over code already resolves against the existing
+theme — bg-scene, text-success, text-accent-foreground, var(--shadow-button),
+var(--shadow-card), font-display, the --mob-* illustration palette, and the
+form-in keyframes that .ob-panel-in reuses.
+
+Noted for the participant but deliberately NOT wired, since it was not requested:
+postLoginPath() in src/lib/onboarding-store.ts is exported but no caller exists.
+src/components/auth/AuthPanel.tsx still navigates to its own redirect target after
+sign-in, so /onboarding is currently reachable only by direct URL. Routing new
+sign-ins through postLoginPath() is a one-line change in AuthPanel whenever the
+team wants it.
+
+Agent Response Summary:
+Added the participant's onboarding flow to the app without changing its design,
+copy, or behaviour: route at /onboarding, container plus SVG illustration scenes
+and slide copy under src/components/onboarding/, local progress store in
+src/lib/onboarding-store.ts, and the animation CSS appended to src/styles.css.
+Repaired 13 JSX template-literal attributes that the paste had corrupted, and
+registered the two missing Tailwind tokens (--color-ink, --animate-fade-in) so
+bg-ink and animate-fade-in actually render. Verified with tsc (zero errors in all
+new files; the 11 remaining errors are pre-existing in the vendored shadcn files
+src/components/ui/calendar.tsx and src/components/ui/chart.tsx), a full
+`npm run build` (exit 0), regeneration of /onboarding in routeTree.gen.ts, and
+inspection of the compiled CSS bundle for all nine .ob-* utilities. Runtime render
+in a browser was not verified this turn.
+
+Commit SHA:
+cb8955a8d569104072e634eaa2861b40fa1fd16e
+
+Files Modified / Created:
+* src/routes/onboarding.tsx (Created)
+* src/components/onboarding/Onboarding.tsx (Created)
+* src/components/onboarding/Illustrations.tsx (Created)
+* src/components/onboarding/slides.ts (Created)
+* src/lib/onboarding-store.ts (Created)
+* src/styles.css (Modified)
+* src/routeTree.gen.ts (Modified — regenerated by the TanStack Router plugin)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read AGENTS.md and docs/logs.txt; confirmed AGREEMENT RECORDED for this repo root, so ran the §4 normal session flow
+* Read src/styles.css, src/routes/__root.tsx, src/routes/login.tsx, src/routeTree.gen.ts, tsconfig.json, package.json, vite.config.ts
+* Listed src/, src/routes/, src/components/, src/lib/ to match existing placement conventions
+* Searched src/ for bg-ink, --color-ink, animate-fade-in (no matches — confirmed both tokens absent)
+* Inspected node_modules/tw-animate-css/dist/tw-animate.css — provides `fade-in` as an animate-in modifier, not a standalone `animate-fade-in` utility
+* Searched src/ for existing onboarding / postLoginPath / ShieldCheck / ShoppingBag references
+* Created the five onboarding source files; appended the onboarding CSS block and two theme tokens to src/styles.css
+* Ran `npm run typecheck` — 11 pre-existing errors, all in untouched vendored shadcn files; none in the new code
+* Ran `npm run build` — exit 0; confirmed onboarding client and SSR chunks emitted
+* Verified /onboarding is present in the regenerated src/routeTree.gen.ts
+* Verified .ob-in-right/.ob-in-left/.ob-rise/.ob-float/.ob-pop/.ob-illus/.ob-grow/.ob-rise-bar/.ob-panel-in, .bg-ink, and .animate-fade-in all compiled into the CSS bundle
+* Ran `git status --short` (confirmed .output/ and .tanstack/ are gitignored), staged the eight files by name, committed as cb8955a
+
+================================================================================
+[2026-10-06T11:27:39+05:30] Wire sign-in to trigger the onboarding flow
+================================================================================
+User Prompt (verbatim):
+i just signed in with a mail but it didnt trigger the onboarding
+
+Agent Response:
+Diagnosed and fixed. This was the loose end flagged at the end of the previous
+turn: the onboarding route existed and rendered, but nothing ever navigated to
+it, so it was reachable only by typing the URL.
+
+Root cause in src/components/auth/AuthPanel.tsx. useSignIn(redirect) is the
+shared choke point for all three sign-in entry points — LoginForm, SignupForm and
+the simulated Google button in SocialLogin all call it. It computed its
+destination as `redirect || fallback`, where fallback is "/vendor" for a vendor
+session, "/admin" for admin, and "/" for everyone else. postLoginPath() from
+src/lib/onboarding-store.ts was exported by the handed-over code but had no
+caller, so "/onboarding" was never in the set of possible destinations. Signing
+in with an email therefore landed on the storefront home, exactly as reported.
+
+Fix: useSignIn now consults postLoginPath(), which answers "/onboarding" only
+while the first run is outstanding:
+
+  const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
+
+Two deliberate decisions in that line. First, the onboarding gate outranks the
+RequireAuth deep link: a signed-out visitor bounced from /account to
+/login?redirect=/account will, on a first run only, land on onboarding rather
+than /account. Treating a first-run gate as lower priority than a redirect would
+mean it never fires for anyone arriving via a gated page. Second, once onboarding
+is complete the pre-existing destination logic is used verbatim rather than
+postLoginPath()'s roleHome() answer — the session role from the RolePicker is
+what actually gates /vendor, whereas roleHome() reads the separate onboarding
+role, and preserving the existing branch keeps behaviour identical for everyone
+who has already been through the flow.
+
+Because all three entry points share useSignIn, the one-line change covers email
+login, account creation and the Google button together. No change was needed in
+any of the handed-over onboarding files.
+
+Flagged for the participant: the completion flag lives in localStorage under
+"markethub.onboarding", so the gate is per-browser, not per-account — it fires
+once per device regardless of which email signs in. Anyone who already clicked
+through /onboarding while testing has onboardingCompleted: true and will keep
+skipping it; clearing that single localStorage key (or calling the exported
+resetOnboarding()) re-arms it. Also noted that the onboarding role choice and the
+sign-in RolePicker are two independent notions in the current design, so signing
+in as Seller and then picking Shop in onboarding lands on /shop.
+
+Agent Response Summary:
+Found that the onboarding page was never being navigated to because
+postLoginPath() had no caller, and wired it into useSignIn in
+src/components/auth/AuthPanel.tsx — the single shared handler behind the login
+form, signup form and Google button. First-run sign-ins now land on /onboarding;
+once the flow is completed the previous redirect/role-home logic applies
+unchanged. Verified with tsc (the same 11 pre-existing errors in the vendored
+src/components/ui/calendar.tsx and src/components/ui/chart.tsx, zero in
+AuthPanel.tsx or any onboarding file) and a full npm run build (exit 0), and
+confirmed in the emitted bundles that the login chunk now references
+"/onboarding" and that onboarding-store is a shared chunk carrying the
+"markethub.onboarding" key. Browser runtime behaviour was not verified this turn.
+
+Commit SHA:
+86ed94b8ffa6f892fd5f6b602f1a0a8676138453
+
+Files Modified / Created:
+* src/components/auth/AuthPanel.tsx (Modified)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read src/components/auth/AuthPanel.tsx in full; traced useSignIn as the shared handler for LoginForm, SignupForm and SocialLogin
+* Read src/lib/store.tsx (login/useStore) to confirm what the session role controls
+* Searched src/ for `redirect:` — found the producer is src/components/mh/RequireAuth.tsx and the validator is safeRedirect in src/routes/login.tsx; weighed gate-vs-redirect precedence against both
+* Added the postLoginPath import and replaced the destination expression in useSignIn (7 insertions, 1 deletion)
+* Ran `npx tsc --noEmit` — 11 pre-existing errors in untouched vendored shadcn files, 0 in AuthPanel.tsx and 0 in the onboarding files
+* Ran `npm run build` — exit 0, server bundle and .output/nitro.json regenerated
+* Verified the built login chunk (.output/public/assets/login-B3PODlJ4.js) references "/onboarding", and that .output/public/assets/onboarding-store-Bstm17DA.js carries the "markethub.onboarding" key
+* Committed as 86ed94b
+
+================================================================================
+[2026-10-06T11:56:31+05:30] Fix rejected push; recover source deleted by 1e185c3b
+================================================================================
+User Prompt (verbatim):
+PS C:\Users\manik\OneDrive\Desktop\Team-51> git push -u origin main
+To https://github.com/AbhinavRangoju/Team-51.git
+ ! [rejected]          main -> main (non-fast-forward)
+error: failed to push some refs to 'https://github.com/AbhinavRangoju/Team-51.git'
+hint: Updates were rejected because a pushed branch tip is behind its remote
+hint: counterpart. If you want to integrate the remote changes, use 'git pull'
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+
+Helppp
+
+Agent Response:
+The push failure itself was benign, but investigating it uncovered a far more
+serious problem on the Frontend branch.
+
+Cause of the rejection: the work is on branch Frontend, while `git push -u origin
+main` pushes the local `main` ref. Local main was still the original starter
+commit 6712750 ("build secure official starter repo"), 34 commits behind
+origin/main and with zero commits of its own. Git correctly refused to move
+origin/main backwards. Pushed Frontend instead (73131f9..1e185c3b) and
+fast-forwarded local main to origin/main (6712750..86e55b4f) with
+`git fetch origin main:main`, which is lossless because local main had no unique
+commits. origin/main has since absorbed PR #2 from the backend branch.
+
+The serious finding: commit 1e185c3b "pushing" by kartikeya-ftw changed 30031
+files, +3737803/-4031. It deleted .gitignore, package.json, package-lock.json,
+.env.example, SECURITY_ARCHITECTURE.md, TEST.md,
+docs/TECHNICAL_SECURITY_DOCUMENTATION.md, src/components/auth/AuthPanel.tsx,
+src/components/auth/CharacterScene.tsx, src/components/mh/AIAssistant.tsx,
+src/components/mh/DashShell.tsx, src/components/mh/LegalPage.tsx,
+src/components/mh/ProductCard.tsx and all 12 src/assets/*.jpg images from BOTH
+the working tree and the index — 25 files in total — and committed .env, 142
+.output files and 29876 node_modules files in their place. With .gitignore gone
+nothing was holding any of it back. The deletions are on disk as well as in git,
+so this was a filesystem-level loss (the repo lives under OneDrive, a plausible
+cause) that the commit then recorded. I had already pushed that commit at the
+start of this turn before inspecting its contents, which was my error.
+
+SECURITY: .env contained a live GEMINI_API_KEY (53-character value, not echoed
+here) and is now in the pushed history of origin/Frontend. Removing it in a later
+commit does not undo that. Told the user to revoke and reissue the key at
+https://aistudio.google.com/apikey as the only real remediation. A history
+rewrite (git filter-repo or BFG plus a force push) would be needed to purge the
+blob itself; that is destructive to a branch teammates share, so it was NOT
+performed and is left as an explicit decision for the team.
+
+Repair performed (non-destructive, a new commit on top — no history rewrite):
+restored all 25 files from 6a6527c with `git checkout 6a6527c -- <paths>`, then
+`git rm -r --cached node_modules .output` and `git rm --cached .env` so the junk
+is untracked while .env stays on disk for local use. The restored .gitignore
+already contained the correct rules — node_modules/, .output/, .env, .env.* with
+a !.env.example negation under a "never commit these" comment — so deleting it
+was the single root cause of the leak, and restoring it closes the hole.
+Confirmed with git check-ignore that .env, node_modules and .output are ignored
+again. Also confirmed the onboarding sign-in gate survived the restore:
+postLoginPath is still imported at AuthPanel.tsx line 5 and used at line 190.
+
+Agent Response Summary:
+Diagnosed the rejected push as a branch mix-up (work on Frontend, stale local
+main 34 commits behind origin/main) and resolved it by pushing Frontend and
+fast-forwarding local main. While verifying the state, found that commit
+1e185c3b had deleted 25 source and config files from both disk and git and
+committed .env, .output and 29876 node_modules files instead, leaving the branch
+unbuildable and leaking a live GEMINI_API_KEY. Restored all 25 files from
+6a6527c, untracked the junk, kept .env on disk, and verified recovery with tsc
+(the same 11 pre-existing errors in the vendored calendar.tsx and chart.tsx, zero
+elsewhere) and a successful npm run build. Key rotation was flagged as urgent and
+a history rewrite was deliberately left to the team as a destructive, shared
+branch decision.
+
+Commit SHA:
+18d520d8 (repair) — also pushed 1e185c3b and fast-forwarded local main this turn
+
+Files Modified / Created:
+* .gitignore (Restored)
+* .env.example (Restored)
+* package.json (Restored)
+* package-lock.json (Restored)
+* SECURITY_ARCHITECTURE.md (Restored)
+* TEST.md (Restored)
+* docs/TECHNICAL_SECURITY_DOCUMENTATION.md (Restored)
+* src/components/auth/AuthPanel.tsx (Restored)
+* src/components/auth/CharacterScene.tsx (Restored)
+* src/components/mh/AIAssistant.tsx (Restored)
+* src/components/mh/DashShell.tsx (Restored)
+* src/components/mh/LegalPage.tsx (Restored)
+* src/components/mh/ProductCard.tsx (Restored)
+* src/assets/hero.jpg, p-bag.jpg, p-books.jpg, p-coffee.jpg, p-headphones.jpg,
+  p-laptop.jpg, p-serum.jpg, p-sneaker.jpg, p-sweater.jpg, p-vase.jpg,
+  p-watch.jpg, p-yoga.jpg (Restored — 12 files)
+* .env (Untracked — kept on disk)
+* node_modules/** (Untracked — 29876 files)
+* .output/** (Untracked — 142 files)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Ran `git fetch origin`, `git branch -vv`, `git branch -r`, `git status --short --branch`
+* Compared branches with `git rev-list --left-right --count` for main...origin/main (0/34) and Frontend...origin/Frontend (6/0)
+* Ran `git merge-base --is-ancestor origin/main Frontend` — origin/main has commits Frontend lacks
+* Pushed Frontend: `git push -u origin Frontend` → 73131f9..1e185c3b
+* Fast-forwarded local main: `git fetch origin main:main` → 6712750..86e55b4f
+* Checked for the gh CLI — not installed, so a PR must be opened via the GitHub web UI
+* Dry-ran the merge with `git merge-tree --write-tree --name-only Frontend main` — exit 1, conflicts in .env.example, .gitignore, docs/logs.txt, node_modules/.package-lock.json, package.json, src/components/auth/AuthPanel.tsx
+* Inspected 1e185c3b with `git show --shortstat` (30031 files, +3737803/-4031) and `git ls-tree --name-only` against 6a6527c to diff the top-level trees
+* Enumerated the 25 deleted non-junk paths and confirmed with Test-Path that they were absent from disk, not merely untracked
+* Listed .env key names only (GEMINI_API_KEY) without echoing the value
+* Restored the 25 paths from 6a6527c; ran `git rm -r --cached node_modules .output` and `git rm --cached .env`
+* Verified with `git check-ignore -v` that .env, node_modules/ and .output/ are ignored again, and that .env remains on disk
+* Confirmed postLoginPath survived in the restored AuthPanel.tsx (lines 5 and 190)
+* Ran `npx tsc --noEmit` — 11 errors, all pre-existing (1 in src/components/ui/calendar.tsx, 10 in src/components/ui/chart.tsx)
+* Ran `npm run build` — succeeded; server bundle and onboarding chunk emitted
+* Committed 18d520d8 and pushed `1e185c3b..18d520d8 Frontend -> Frontend`
+
+================================================================================
+[2026-10-06T12:05:00+05:30] LOG MERGE NOTE - branch Frontend <- main
+================================================================================
+Both branches appended to this append-only log independently, so the two runs
+of entries conflicted when main was merged into Frontend. Every entry from
+both sides is preserved verbatim: the block above came from branch Frontend,
+the block below came from main. Nothing was reordered, rewritten or dropped,
+per AGENTS.md section 2. The two spans interleave in wall-clock time -
+Frontend covers 2026-10-05T21:42:10 to 2026-10-06T11:56:31 and main covers
+2026-10-06T07:49:35 to 2026-10-06T11:01:12 - and were left as whole blocks
+rather than interleaved so that no entry is split or resequenced.
+
+================================================================================
 [2026-10-06T07:49:35+05:30] SESSION START
 ================================================================================
 Agent: Kiro (Claude Opus 5)
@@ -3897,3 +4362,148 @@ Actions Taken:
   are byte-identical, verified line-by-line against a temporary backup
   taken before the rewrite (0 differences across 3796 lines); that temporary
   backup was then deleted.
+
+--------------------------------------------------------------------------------
+[2026-10-06T12:52:00+05:30] MERGE RECONCILIATION - docs/logs.txt (second seam)
+--------------------------------------------------------------------------------
+Merge: origin/main (b9c14cc4, "docs: log Frontend into main merge and conflict
+       resolutions") into local main (3c612296, "docs: log Neon DATABASE_URL
+       setup and live-verification handoff").
+Merge base: 86e55b4fc8c65c4da09773364503b7f58d026b26
+
+Conflict: one hunk at the tail. Both branches appended to this append-only log
+after the common ancestor. Git auto-merged the shared history above this point.
+
+RESOLUTION: UNION. Both sides are preserved verbatim and in full. No entry was
+rewritten, truncated, reordered within its own branch, or deleted, per AGENTS.md
+section 2 (append-only) and section 7 (logging is non-overridable).
+
+  block ABOVE this note : the 11 entries appended on the local main line of
+                          development (the Security-branch work merged in at
+                          12:05, plus the Neon DATABASE_URL turn at 12:35).
+  block BELOW this note : the 1 entry appended on origin/main (the 12:18:57
+                          Frontend-into-main merge).
+
+True chronological order across this seam:
+  2026-10-06T11:40:20  local   MERGE RECONCILIATION - docs/logs.txt (first seam)
+  2026-10-06T12:05:00  local   Complete paused merge; integrate main into Security
+  2026-10-06T12:18:57  remote  Merge Frontend into main; all frontend code on main
+  2026-10-06T12:35:17  local   Neon DATABASE_URL supplied in .env
+
+NOTE ON THE REMOTE SIDE OF THIS FILE: stage 3 (origin/main) was NOT a strict
+append onto the merge base - 2084 of the first 2694 lines differed in position.
+That is the expected signature of the earlier union merge on the main line
+reordering shared blocks, not of content loss. This resolution was therefore
+verified by ENTRY-HEADER CENSUS rather than by assuming a prefix relationship:
+every timestamped entry header present in the base, in ours, or in theirs is
+asserted present in the result. See the Actions Taken of the turn entry that
+follows for the verification output.
+
+Resolved by: Kiro (Claude Opus 5), orchestrating on branch main.
+--------------------------------------------------------------------------------
+[2026-10-06T12:18:57+05:30] Merge Frontend into main; all frontend code now on main
+================================================================================
+User Prompt (verbatim):
+merge frontend with main, All frontend code must be in main
+
+Agent Response:
+Done. origin/main and origin/Frontend both now point at merge commit a50f9a67,
+which carries the full frontend (onboarding flow included) on top of the backend
+layer that PR #2 landed.
+
+Strategy: merged main INTO Frontend first so the conflicts were resolved on the
+feature branch, then fast-forwarded main. That kept main free of any conflict
+resolution of its own and guaranteed no teammate commit could be lost — verified
+with `git merge-base --is-ancestor origin/main Frontend` before pushing, and
+origin/main was re-fetched immediately beforehand to confirm it had not moved
+off 86e55b4f. The push was a pure fast-forward adding 12 commits.
+
+Conflict 1 — src/components/auth/AuthPanel.tsx. The backend branch had rewritten
+this file (347 to 288 lines, +80/-129) while the Frontend change was 7 lines, so
+main's version was taken wholesale via `git checkout --theirs` and the onboarding
+gate re-applied on top. main had renamed useSignIn to useLandAfterAuth, made it
+async to await refreshUser(), switched the destination to the role the SERVER
+returns, and deleted the client-side RolePicker because it let a visitor write
+`vendor` straight into their own session. All of that was preserved — the
+RolePicker was NOT reinstated — and the gate went back in as one line plus one
+import:
+
+  const to = postLoginPath() === "/onboarding" ? "/onboarding" : redirect || fallback;
+
+The security property is intact: the role still comes only from the server, and
+the localStorage onboarding flag influences first-run routing and nothing else.
+It cannot grant a role or reach a gated route.
+
+Conflict 2 — docs/logs.txt. Both branches had appended independently, producing
+one conflict block: 6 Frontend entries (2026-10-05T21:42:10 to
+2026-10-06T11:56:31) against 11 main entries (2026-10-06T07:49:35 to
+2026-10-06T11:01:12). AGENTS.md section 2 forbids rewriting, reordering or
+deleting prior entries, so every entry from both sides was kept verbatim as two
+whole blocks with a LOG MERGE NOTE at the seam recording why the order is
+block-wise rather than strictly chronological. The two spans interleave in
+wall-clock time; interleaving them entry-by-entry would have meant resequencing
+existing records, so it was deliberately avoided. The file was read and written
+through System.Text.UTF8Encoding to avoid the PowerShell default-codepage
+round-trip mangling the em dashes; confirmed 258 U+2014 characters survive and
+the header still reads "BUILD SECURE 24 — PROMPT & ENGINEERING ACTIVITY LOG".
+
+Incident during the merge: 6 files vanished from the working tree again —
+src/routes/onboarding.tsx, all three src/components/onboarding/* files,
+src/lib/onboarding-store.ts and docs/TECHNICAL_SECURITY_DOCUMENTATION.md. They
+were still tracked in the index and in HEAD, so `git status` reported them as
+unstaged deletions and `git checkout --` restored all 6. This is the second
+disk-level disappearance this session and matches the earlier 1e185c3b incident;
+the repository living inside a OneDrive-synced folder remains the prime suspect
+and the team was advised again to relocate it outside OneDrive.
+
+Agent Response Summary:
+Merged main into Frontend, resolved the two conflicts, then fast-forwarded
+origin/main to the result so all four refs (Frontend, main, origin/Frontend,
+origin/main) sit at a50f9a67. AuthPanel kept main's server-authoritative auth and
+its removal of the client-side RolePicker, with the onboarding gate re-applied as
+a single line; docs/logs.txt kept all 17 entries from both branches verbatim.
+Recovered 6 more files that disappeared from disk mid-merge. Verified with tsc
+(the same 11 pre-existing errors in the vendored calendar.tsx and chart.tsx and
+no others), a successful npm run build, /onboarding present in the regenerated
+route tree, and the built login chunk still referencing /onboarding. Confirmed on
+origin/main: 154 tracked files, all 5 onboarding sources and all 17 backend
+api/server/scripts files present, .env untracked, .env.example tracked,
+node_modules and .output at 0 files.
+
+Commit SHA:
+a50f9a6733c60757245bb920dc0b4f6b224f5c53
+
+Files Modified / Created:
+* src/components/auth/AuthPanel.tsx (Modified — conflict resolved: main's version + onboarding gate)
+* docs/logs.txt (Modified — conflict resolved: both branches' entries preserved)
+* src/routes/onboarding.tsx (Restored after disk deletion)
+* src/components/onboarding/Onboarding.tsx (Restored after disk deletion)
+* src/components/onboarding/Illustrations.tsx (Restored after disk deletion)
+* src/components/onboarding/slides.ts (Restored after disk deletion)
+* src/lib/onboarding-store.ts (Restored after disk deletion)
+* docs/TECHNICAL_SECURITY_DOCUMENTATION.md (Restored after disk deletion)
+* Merged in from main: src/lib/api/{auth,checkout,orders,vendor}.ts,
+  src/lib/server/{db,dto,guards,password,pricing,ratelimit,seed,session,validate}.ts,
+  src/lib/money.ts, src/test/backend.test.ts,
+  scripts/{cookie-check,e2e,find-serverfn-ids,seroval-lite}.mjs,
+  MarketHub_shared_project_roles.md, and updates to src/lib/store.tsx,
+  src/components/mh/RequireAuth.tsx, src/routes/{account,cart,checkout,orders,vendor}.tsx,
+  package.json, package-lock.json, README.md, docs/APPROACH.md, deployment/README.md,
+  .gitignore, .env.example
+
+Actions Taken:
+* Captured pre-merge SHAs (Frontend 88299702, main 86e55b4f) as a recovery point
+* Compared AuthPanel.tsx across merge-base/Frontend/main with `git diff --stat` to size each side's change
+* Read main's useLandAfterAuth to understand the server-authoritative rewrite before resolving
+* Ran `git merge main --no-edit`; confirmed exactly 2 conflicts via `git diff --diff-filter=U`
+* Resolved AuthPanel.tsx with `git checkout --theirs`, then re-added the postLoginPath import and the one-line gate
+* Mapped the logs.txt conflict markers (1621/2073/3147), compared each block's timestamp span, and rebuilt the file as header + Frontend block + merge note + main block using UTF8Encoding
+* Verified zero conflict markers remain and that the seam renders correctly into main's first SESSION START entry
+* Detected 6 unstaged deletions via `git status --porcelain` and restored them with `git checkout --`
+* Ran `npx tsc --noEmit` — 11 errors, all pre-existing (1 calendar.tsx, 10 chart.tsx)
+* Ran `npm run build` — succeeded; confirmed /onboarding in src/routeTree.gen.ts and onboarding chunks emitted
+* Confirmed the built login chunk references /onboarding, and that AuthPanel retains @/lib/api/auth, refreshUser and no RolePicker
+* Committed the merge as a50f9a67; pushed `88299702..a50f9a67 Frontend -> Frontend`
+* Re-fetched origin, re-verified `git merge-base --is-ancestor origin/main Frontend`, then pushed `86e55b4f..a50f9a67 Frontend -> main` (fast-forward, 12 commits)
+* Synced local main with `git fetch origin main:main`; confirmed all four refs at a50f9a67
+* Audited origin/main's tree: 154 files, onboarding and backend both present, .env absent, node_modules/.output at 0
