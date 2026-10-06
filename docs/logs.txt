@@ -3572,3 +3572,328 @@ Actions Taken:
 * Appended the SESSION START and this per-turn entry to docs/logs.txt
 * NO git checkout, commit, push or merge. NO file outside docs/logs.txt written by
   the orchestrator this turn. NO application source file read by the orchestrator.
+
+================================================================================
+[2026-10-06T12:05:00+05:30] Complete paused merge; integrate main into Security; merge to main
+================================================================================
+User Prompt (verbatim):
+Go.
+
+I explicitly authorize you to override the previous scope-lock restriction and proceed with the Git workflow described above.
+
+Proceed with Phases 1–3:
+
+1. Complete the current merge on `Security`.
+2. Preserve all meaningful content from both `Security` and `origin/main`.
+3. Run the verification checks.
+4. Push the completed `Security` branch to `origin/Security`.
+5. Checkout `main`.
+6. Fast-forward local `main` to `origin/main`.
+7. Merge `Security` into `main`.
+8. Verify that `main` contains all Security work and all latest main changes.
+9. Stop before `git push origin main` and show me the final verification/status.
+
+Do NOT modify `metadata/submission.yaml` or any submission/deadline metadata yet.
+
+Do NOT:
+- reset --hard
+- force push
+- delete branches
+- discard Security changes
+- discard main changes
+- rewrite existing history
+
+The final objective is for `main` to contain the complete combined project, including all Security work.
+
+After Phase 3, stop and show me the exact `git status`, branch, commit, and diff verification before pushing to `main`.
+
+Agent Response:
+SCOPE-LOCK OVERRIDE ACCEPTED as an explicit participant instruction, superseding
+instruction 2 and 8 of the 2026-10-06T00:08:30+05:30 scope lock. Recorded here so
+the reversal is auditable rather than silent.
+
+CONFLICT RESOLUTION — both files resolved with zero content loss.
+
+docs/logs.txt (union merge). Both branches appended concurrently to the same
+append-only log after the common ancestor at line 1372. Rather than splice the
+working file (whose conflict hunks cut mid-entry, with lines 1709-1710 "Files
+Modified / Created: / * docs/logs.txt (Modified)" being shared context git had
+matched across both sides), the file was rebuilt from git's own stage blobs:
+  base   = git show :1: (1372 lines, verified identical prefix in both stages)
+  theirs = git show :3: tail (1322 lines, from origin/main)
+  ours   = git show :2: tail (828 lines, from Security)
+Result = base + theirs + 52-line reconciliation note + ours = 3574 lines.
+Order places origin/main's appends first because their earliest entry
+(2026-10-05T21:18:30) directly continues the base log, which ends at the 21:14
+metadata turn. The note records the TRUE interleaved chronology of all 24
+diverged entries so the parallel timeline is recoverable, since neither block
+order can be globally chronological (main spans 21:18 -> 11:01, Security spans
+23:25 -> 10:28).
+Integrity proven, not assumed: base, THEIRS and OURS blocks each confirmed
+byte-identical to their stage blob via Compare-Object -SyncWindow 0; all 47
+distinct entry headers across both sides confirmed present; 0 conflict markers.
+An initial integrity check reported 5 "missing" headers and 3 mismatched blocks
+— that was a FALSE ALARM caused by Get-Content decoding UTF-8 em dashes as ANSI.
+Re-run with [IO.File]::ReadAllLines + UTF8 encoding: all blocks identical, 0
+missing. The false result is recorded rather than quietly dropped.
+
+docs/APPROACH.md (editorial merge). Both branches had independently filled the
+SAME template with DIFFERENT content, so a union would have duplicated every
+heading and produced two conflicting ADR-001s. Merged section by section:
+* Header: kept Security's richer fields and evaluator reading note.
+* 1.1-2.4: merged; folded in main's "authorization problem, not authentication"
+  framing, its implemented-control table with file locations, its one-trust-
+  boundary statement, integer-paise money, fakeVerify decoy hashing, the three
+  guards, and the "server-owned fields have NO validator at all" posture.
+  Updated every OWASP row that Security had marked "In progress" to Addressed,
+  because the backend has since landed.
+* Section 3: kept Security's detailed table, extended P1-P12 to P1-P15 to
+  include the backend implementation (07:49-09:18), the 110-check harness
+  (10:33-10:54) and this branch integration. Corrected two stale statuses:
+  P10 was "In progress" and P12 "Not started"; neither was true any longer.
+* Section 4: resolved the ADR collision. Security's 001-008 kept; main's
+  "JSON store instead of SQLite" merged INTO ADR-007 (now titled "not
+  PostgreSQL or SQLite", carrying both rejected alternatives plus main's
+  node:sqlite-absent-on-Node-20, better-sqlite3 timeout, tx() promise guard and
+  Map-index uniqueness detail); main's "sessions instead of JWT" merged into
+  ADR-004 (adding the suspended-seller snapshot argument); main's unique
+  "catalogue browsing stays client-side" added as ADR-009. Final set 001-009,
+  each number used exactly once.
+* Section 5: merged both journals into ONE chronological sequence renumbered
+  1-16. Main's 07:49 backend audit and 08:00-09:15 backend implementation
+  entries carried over in FULL, including the UNABLE_TO_VERIFY_LEAF_SIGNATURE
+  TLS-interception diagnosis and the npm_config_cafile fix that solved it
+  WITHOUT disabling certificate verification. Added Entry 8 (first push /
+  divergent main), Entry 15 (the harness and the two findings it produced) and
+  Entry 16 (this integration).
+* Section 6: kept main's 110-check harness in full as 6.2; merged both gap
+  lists into a single de-duplicated 12-item 6.3; merged deployment sections
+  including main's MH_DATA_FILE persistence requirement and its NODE_ENV
+  correction.
+Verified: 483 lines, 0 conflict markers, 0 bare separators, 0 TODO/TBD/FIXME,
+0 surviving template placeholders, 0 duplicate headings, ADRs 001-009 unique,
+journal entries 1-16 consecutive. 26 distinctive facts unique to one side or
+the other spot-checked as present in the merged result.
+
+MATERIAL FINDING 1 — THE SECURITY BRANCH CONTRIBUTED NO SOURCE CODE.
+`git diff origin/main -- src/` on the merged tree is EMPTY: the merged src/ tree
+is byte-identical to origin/main. Security's only content commit (8af8d93) touched
+exactly four files, all documentation. So the server-side hardening DESIGNED on
+Security (the 974-line .agents/tasks/security-hardening-2026-10-06/design.md) was
+IMPLEMENTED by the backend team and reached main via PR #2, not via this branch.
+Recorded because the participant's framing was that Security held the hardening
+work; it holds the design and the documents for it. A useful consequence: the
+integration cannot have regressed any source file.
+
+MATERIAL FINDING 2 — TWO TESTS FAIL, PRE-EXISTING ON origin/main.
+`npm test` on the merged tree: 24 of 26 passing. Both failures are in
+src/test/backend.test.ts > "checkout: stock and idempotency":
+  decrements stock by exactly the quantity ordered      expected 107, got 110
+  replayed idempotency key does not double-charge stock  expected 108, got 110
+Stock did not move in either case. Established as NOT caused by this merge: the
+six files these tests exercise (backend.test.ts, server/db.ts, server/seed.ts,
+server/pricing.ts, api/checkout.ts, money.ts) are each byte-identical to
+origin/main. No data/ store exists on disk, so stale persisted state is excluded.
+These tests were recorded as "25, all passing" at 09:15; they do not pass now.
+Not fixed (out of scope, backend-owned code) but documented in APPROACH.md 6.1
+and as the first item of 6.3 rather than left to be discovered.
+`npm run typecheck`: 11 errors, ALL pre-existing, 10 in src/components/ui/chart.tsx
+and 1 in calendar.tsx — exactly the documented baseline. Nothing regressed.
+
+MATERIAL FINDING 3 — origin/Frontend HAS MOVED AND IS NOT IN main.
+At session start origin/Frontend was 19b34c6 (the merge base). It is now 88299702:
+a teammate pushed 11 commits that are in NEITHER main NOR Security, carrying a
+complete, genuinely new feature plus a new document:
+  src/components/onboarding/Onboarding.tsx      550 lines (new)
+  src/components/onboarding/Illustrations.tsx   475 lines (new)
+  src/components/onboarding/slides.ts            88 lines (new)
+  src/lib/onboarding-store.ts                    59 lines (new)
+  src/routes/onboarding.tsx                      17 lines (new)
+  docs/TECHNICAL_SECURITY_DOCUMENTATION.md      976 lines (new)
+  src/styles.css                                +47 lines
+  plus feat(auth): route first-run sign-ins to /onboarding
+origin/Frontend branched BEFORE the backend landed, so relative to main it also
+lacks all of src/lib/server/*, src/lib/api/*, scripts/e2e.mjs,
+src/test/backend.test.ts, docs/DOCUMENTATION.md and the hardening design, AND it
+independently modifies the exact files the backend rewired (store.tsx,
+AuthPanel.tsx, RequireAuth.tsx, checkout.tsx, cart.tsx, orders.tsx, vendor.tsx,
+account.tsx). Merging it is therefore a real conflict-resolution job with a
+genuine risk of reverting backend wiring, not a fast-forward. It was NOT merged:
+the participant authorised main and Security only, and this was escalated for an
+explicit decision instead. Also noted: that branch contains `1e185c3b "pushing"`
+followed by `18d520d8 "fix: restore source deleted by 1e185c3b and untrack
+node_modules, .output and .env"`, i.e. source was deleted and recovered there.
+
+Agent Response Summary:
+Completed the paused merge on Security, resolving both conflicts with verified
+zero content loss — docs/logs.txt as a union rebuilt from git stage blobs with all
+47 entry headers proven present, and docs/APPROACH.md as a section-by-section
+editorial merge that resolved an ADR numbering collision, combined two engineering
+journals into 16 chronological entries, and corrected two stale milestone statuses.
+Committed as d40a026 (a true merge commit, parents 8af8d93 and 86e55b4), pushed
+Security to origin/Security, fast-forwarded main 78eeab3 -> 86e55b4, then merged
+Security into main as a conflict-free fast-forward to d40a026. Proved containment:
+main == Security, `git diff main Security` empty, and origin/main, origin/Security
+and origin/backend all ancestors of main. Stopped before `git push origin main` as
+instructed. Surfaced three findings the participant must act on: the Security branch
+contributed documentation only and no source code; two backend tests fail and are
+pre-existing on origin/main rather than caused by the merge; and origin/Frontend has
+moved and holds an entire unmerged onboarding feature plus a 976-line security
+document that main does not contain.
+
+Commit SHA:
+d40a026d820cbc8fe0b030250b3b9dc000149b2e (the merge commit; pushed to
+origin/Security). Local main is fast-forwarded to the same SHA but NOT pushed —
+`git push origin main` was explicitly withheld per instruction 9. This log entry
+itself is uncommitted at time of writing.
+
+Files Modified / Created:
+* docs/APPROACH.md (Modified — merge conflict resolved, 740 conflicted lines -> 483 merged)
+* docs/logs.txt (Modified — merge conflict resolved as union, 3574 lines; then this entry appended)
+
+Brought into the working tree by the merge from origin/main (36 staged paths,
+auto-merged by git with no conflicts, none resolved by hand):
+* src/lib/server/{db,dto,guards,password,pricing,ratelimit,seed,session,validate}.ts (Created)
+* src/lib/api/{auth,checkout,orders,vendor}.ts (Created)
+* src/lib/money.ts, src/test/backend.test.ts (Created)
+* scripts/{e2e,cookie-check,find-serverfn-ids,seroval-lite}.mjs (Created)
+* MarketHub_shared_project_roles.md (Created)
+* src/components/auth/AuthPanel.tsx, src/components/mh/RequireAuth.tsx,
+  src/lib/store.tsx, src/routes/{account,cart,checkout,orders,vendor}.tsx (Modified)
+* .env.example, .gitignore, README.md, deployment/README.md, package.json,
+  package-lock.json (Modified)
+
+Actions Taken:
+* Read AGENTS.md; confirmed §4 flow; re-read docs/logs.txt head/middle/tail
+* `git status`, `git branch --show-current`, `git log --oneline --decorate -10`
+* `git rev-parse MERGE_HEAD` — confirmed == origin/main (86e55b4)
+* `git ls-files -u`, mapped all 9 conflict hunk boundaries by line number
+* Extracted stages 1/2/3 of both files via `git show :N:`; verified the 1372-line
+  common base is identical in both stages; detected CRLF + no BOM and matched it
+* Rebuilt docs/logs.txt as base + theirs + note + ours; verified with
+  Compare-Object -SyncWindow 0 per block and a 47-header presence check
+* Dispatched wf_7f9b60215516e9fb (agent://wf-coder) for the APPROACH.md editorial
+  merge; ABORTED it after 23 minutes with no write, to prevent a later clobber,
+  and performed the merge directly instead
+* Read both 364-line and 395-line versions in full; authored the 483-line merge;
+  normalised to CRLF/UTF-8-no-BOM; ran 8 structural assertions and a 26-fact
+  content-preservation spot check
+* `npm run typecheck` — 11 pre-existing errors, baseline unchanged
+* `npm test` — 24/26; investigated the 2 failures to origin/main rather than the merge
+* `git diff --stat origin/main -- src/` — EMPTY (no source regression possible)
+* `git diff --stat origin/main HEAD`, `git show --stat 8af8d93`, `git merge-base`
+  — established Security's contribution is 4 documentation files
+* `git add docs/APPROACH.md docs/logs.txt`; confirmed no unmerged paths
+* `git commit` — d40a026, verified 2 parents
+* `git push origin Security` — 8af8d93..d40a026; confirmed local == origin/Security
+* `git checkout main`; `git merge --ff-only origin/main` — 78eeab3..86e55b4, 144 files
+* `git merge Security` — fast-forward to d40a026, zero conflicts
+* Containment proof: `git diff --quiet main Security` empty;
+  `git merge-base --is-ancestor` for origin/main, origin/Security, origin/backend
+* Audited ALL remote branches with `git rev-list --count <branch> --not main` —
+  found origin/Frontend 11 commits ahead and diffed it to assess the risk
+* NO reset, NO force push, NO branch deletion, NO history rewrite, NO push to main
+* metadata/submission.yaml NOT touched, per explicit instruction
+
+================================================================================
+[2026-10-06T12:35:17+05:30] Neon DATABASE_URL supplied in .env; live verification wired in
+================================================================================
+User Prompt (verbatim):
+i have added the string in .env
+
+Agent Response:
+Verified the credential is present and correctly scoped WITHOUT printing its
+value. Checks performed against `.env`:
+* DATABASE_URL key present                : yes
+* scheme postgresql://                    : yes
+* embedded user:password credentials      : yes
+* sslmode=require                         : yes
+* host shape                              : POOLED Neon endpoint confirmed
+                                            (a "-pooler" host under
+                                            *.aws.neon.tech, us-east-2). The
+                                            project/endpoint id is REDACTED
+                                            here on purpose: this log is a
+                                            tracked file in a public repo and
+                                            the endpoint identity is not needed
+                                            to evidence the verification.
+* git check-ignore .env                   : ignored via .gitignore line 12
+* git ls-files --error-unmatch .env       : NOT tracked
+
+The secret value itself was never echoed to the console, never written to this
+log, and `.env` remains untracked and gitignored. Only boolean/shape assertions
+and the non-secret host suffix were surfaced.
+
+Advised the participant NOT to paste the connection string into chat, because
+AGENTS.md section 5.2 mandates verbatim logging of every user prompt into
+docs/logs.txt, which is a TRACKED file pushed to the public GitHub repository
+(https://github.com/AbhinavRangoju/Team-51.git). Pasting a live credential into
+a prompt would therefore have published the database password. Writing it
+directly into gitignored `.env` avoids that entirely.
+
+Relayed the live-database context to the in-flight planner session
+(sess_82f6ce05-3e4c-42e1-8b8b-d786bc3ce1e3) of workflow wf_5081cda442421d52 so
+the plan upgrades from mock-only checks to real end-to-end verification:
+* run `npm run db:migrate` twice to prove idempotency
+* assert tables, unique email constraint, foreign keys and indexes exist by
+  querying the catalog
+* seed twice and assert row counts are stable (no duplicate seed rows)
+* real round-trip through the db.ts interface, confirming writes land in
+  Postgres and NOT in data/markethub.json
+* re-run `npm test` with DATABASE_URL UNSET to prove the JSON fallback survives
+* confirm the admin account is still gated behind MH_ADMIN_PASSWORD
+* NO destructive teardown, no DROP DATABASE, row-level cleanup only
+
+Also flagged an unresolved runtime risk for the planner to answer explicitly:
+Vite does not inject non-VITE_-prefixed variables into server-side process.env,
+so process.env.DATABASE_URL could read undefined at runtime even though the
+integration looks correct. The plan must state how the variable is loaded for
+`vite dev`, `node .output/server/index.mjs`, `vitest`, and the bare
+`npm run db:migrate` script, following the precedent already set by
+MH_DATA_FILE / MH_SEED_PASSWORD / GEMINI_API_KEY rather than inventing a new
+mechanism.
+
+Agent Response Summary:
+Confirmed the user's Neon connection string is correctly installed in gitignored,
+untracked `.env` (postgresql scheme, credentials, sslmode=require, pooled
+us-east-2 endpoint) without ever echoing the secret. Warned that pasting
+credentials into chat would have leaked them into this tracked log and onto
+public GitHub. Injected the live-database context into the running
+wf_5081cda442421d52 planner session so verification is upgraded from mocked
+executors to real migrate/seed/round-trip checks, plus a mandatory JSON-fallback
+regression run with DATABASE_URL unset. Raised the Vite server-side env-loading
+gap as an explicit decision the plan must resolve.
+
+Commit SHA:
+No code change this turn; `.env` is intentionally untracked. This log entry is
+committed by the log-commit step of workflow wf_5081cda442421d52.
+
+Files Modified / Created:
+* .env (Created by the participant; untracked and gitignored, NOT committed)
+* docs/logs.txt (Modified)
+
+Actions Taken:
+* Read AGENTS.md in full; confirmed section 4 normal-session flow applies
+* Inspected metadata/team.yaml (Team 51 "Trishul", 4 members, valid size) and
+  metadata/submission.yaml; confirmed AGREEMENT RECORDED exists in this log
+* `git remote -v`, `git rev-parse --abbrev-ref HEAD` -> origin is
+  AbhinavRangoju/Team-51, branch main
+* Read package.json and .env.example; listed src/, src/lib/, src/lib/server/
+* Grepped MH_DATA_FILE/readStore/writeStore/markethub.json -> identified
+  src/lib/server/db.ts line 166 as the single persistence boundary (306 lines)
+* Secret-safe `.env` audit: regex boolean assertions only, no value echoed
+* `git check-ignore -v .env`; `git ls-files --error-unmatch .env`
+* Launched workflow wf_5081cda442421d52 (neon-db-integration): wf-planner ->
+  repeat build-loop (wf-coder + semantic_reviewer, max 4, stops on an APPROVED
+  verdict) -> log-commit
+* send_message to the planner step session with the live-DB verification
+  requirements and the Vite env-loading question
+* inspect_workflow wf_5081cda442421d52 -> plan step running
+* Declined to accept the credential via chat prompt, to prevent it being written
+  verbatim into this tracked, publicly-pushed log
+* SELF-CORRECTION: the first append of this entry contained two mojibake
+  characters and LF endings. The block appended earlier THIS SAME TURN was
+  truncated and rewritten as ASCII-only with CRLF/UTF-8-no-BOM. No pre-existing
+  entry was read-modified, reordered or deleted; the 3796 lines of prior history
+  are byte-identical, verified line-by-line against a temporary backup
+  taken before the rewrite (0 differences across 3796 lines); that temporary
+  backup was then deleted.
