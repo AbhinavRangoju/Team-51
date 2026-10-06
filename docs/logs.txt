@@ -2934,3 +2934,143 @@ Actions Taken:
 * Ran production build and verified emitted cart handlers
 * Restored irrelevant generated route-tree line-ending churn
 * Did not push
+
+================================================================================
+[2026-10-06T13:02:40+05:30] Post-hack Phase 3: address APIs
+================================================================================
+User Prompt (verbatim):
+Continue with Phase 3 — Address APIs.
+
+Backend only. Do not modify frontend code.
+
+Important:
+
+- Database and deployment are already handled by another teammate on another laptop.
+
+- Do NOT implement PostgreSQL migration or deployment work.
+
+- Reuse the existing database/data-layer abstractions.
+
+- Do not change checkout, authentication, or existing cart/product behavior.
+
+Implement:
+
+- getMyAddresses
+
+- createAddress
+
+- updateAddress
+
+- deleteAddress
+
+- setDefaultAddress
+
+Requirements:
+
+- Authentication required
+
+- userId must always come from the authenticated session
+
+- Never accept userId from the client
+
+- Strict input allow-list; reject unknown/mass-assignment fields
+
+- Maximum 10 saved addresses per user
+
+- Validate name, phone, address lines, city, state, postal/PIN code and country
+
+- User can only read/update/delete their own addresses
+
+- Prevent cross-user IDOR
+
+- Server-generated unpredictable address IDs
+
+- Default address must be user-scoped
+
+- Only one default address per user
+
+- Do not expose internal user/account fields
+
+- Add security tests for ownership, validation, IDOR and malicious input
+
+Implement, test, build, and report the result.
+
+Agent Response:
+Implemented Phase 3 only in the isolated post-hack worktree on branch
+post-hack/backend-product-apis. No frontend, checkout, authentication, cart,
+product, frozen submission source, database-migration or deployment work was
+changed. Reused the existing JSON data-layer abstractions as instructed.
+
+Implementation:
+* Added AddressRow and a persistent addresses Map to the store, with hydration
+  and snapshot persistence alongside the existing tables.
+* Added src/lib/server/addresses.ts: an internal user-scoped service with
+  listAddressRows, createAddressForUser, updateAddressForUser,
+  setDefaultAddressForUser and deleteAddressForUser. All default-address writes
+  run inside tx() and only touch rows owned by the given userId.
+* Added src/lib/api/addresses.ts: getMyAddresses, createAddress, updateAddress,
+  deleteAddress and setDefaultAddress. Each resolves userId via requireUser()
+  only; no endpoint accepts a userId.
+* requireOwnAddress returns not-found for a non-owner, so address IDs cannot be
+  enumerated across users. IDs are randomUUID (unpredictable); ownership, not
+  obscurity, is the IDOR boundary.
+* strictObj allow-list validation. Create/update reject userId, id, isDefault,
+  createdAt, updatedAt and all unknown fields. Fields validated: label, name,
+  phone (Indian mobile), line1, optional line2, city, state, postalCode (6-digit
+  PIN) and country.
+* Country is deliberately constrained to IN, consistent with the existing
+  Indian phone/PIN validation in the codebase, rather than falsely claiming
+  universal international address validation.
+* Per-user maximum of 10 addresses. First saved address becomes default; exactly
+  one default per user is maintained; deleting the default deterministically
+  promotes the next remaining address.
+* AddressDto returns owner postal fields only — no userId, no timestamps, no
+  internal account fields.
+* Registered the address module in the server entry (backend-only), emitting all
+  five functions without touching any frontend route or component.
+
+Testing:
+* npx vitest --run --config ./vitest.server.config.ts with a fresh temporary
+  MH_DATA_FILE: 4 files, 52/52 tests passed.
+* Added 11 address tests: full field validation, mass-assignment rejection,
+  partial-update/clear-line2 rules, UUID id shape, first/only-default invariant,
+  single-default-per-user without cross-user effect, cross-user read/update/
+  delete/set-default IDOR denial, deterministic default promotion on delete,
+  per-user (not global) 10-address cap, safe field updates, and DTO internal
+  field exclusion.
+* Typecheck: no new errors (only the two pre-existing stale shadcn UI wrappers).
+* npm run build: exit 0; server bundle present; emitted function count 27
+  (22 prior + five address functions), all five address handlers verified in the
+  server bundle.
+* Confirmed no diffs to src/routes, src/components, src/lib/store.tsx,
+  checkout.ts or auth.ts.
+
+Agent Response Summary:
+Completed Phase 3 address APIs in the separate post-hack branch with session-only
+ownership, strict input contracts, server-generated IDs, a per-user address cap,
+a single-default invariant, cross-user IDOR protection and owner-only DTOs.
+Checkout, authentication, cart and product behavior are unchanged. Phase 3 source
+commit is 4f7b961b7279eea4866feaf7492b2207d6f2b7a9.
+
+Commit SHA:
+4f7b961b7279eea4866feaf7492b2207d6f2b7a9 (post-hack Phase 3 code)
+
+Files Modified / Created:
+* src/lib/api/addresses.ts (Created)
+* src/lib/server/addresses.ts (Created)
+* src/lib/server/db.ts (Modified)
+* src/lib/server/dto.ts (Modified)
+* src/lib/server/guards.ts (Modified)
+* src/server.ts (Modified — server-only address registration)
+* src/test/addresses.test.ts (Created)
+* vitest.server.config.ts (Modified)
+* docs/logs.txt (Modified — post-hack branch only)
+
+Actions Taken:
+* Inspected Phase 2 persistence/guard/DTO baseline in the isolated worktree
+* Added address persistence, service, guard, DTO and five server functions
+* Added focused address security tests and registered them in the Node test config
+* Ran the server test suite with temporary data; 52/52 passed
+* Ran typecheck and production build; verified emitted address handlers
+* Restored irrelevant generated route-tree churn
+* Did not push
